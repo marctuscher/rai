@@ -610,7 +610,7 @@ void LGP_Node::displayBound(OpenGL& gl, BoundType bound){
     rai::Enum<BoundType> _bound(bound);
     gl.title.clear() <<"BOUND " <<_bound <<" at step " <<step;
     gl.setTitle();
-    komoProblem(bound)->gl = &gl;
+    komoProblem(bound)->gl = make_shared<OpenGL>(&gl);
     if(bound>=BD_path && bound<=BD_seqVelPath)
       while(komoProblem(bound)->displayTrajectory(.1, true, false));
     else
