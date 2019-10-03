@@ -12,7 +12,6 @@
 //OpenCV (C++) wrappers
 
 #ifdef RAI_OPENCV
-
 #undef COUNT
 //#include <opencv/highgui.h>
 #include <opencv2/opencv.hpp>
@@ -65,7 +64,6 @@ inline floatA conv_cvMat2floatA(const cv::Mat& mat) {
 char cvShow(const byteA& img, const char *window="opencv", bool wait=false);
 char cvShow(const floatA& img, const char *window="opencv", bool wait=false);
 void getDiffProb(floatA& diff, const byteA& img0, const byteA& img1, float pixSdv, uint range);
-
 #else
 
 #include <Core/array.h>
