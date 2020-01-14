@@ -17,10 +17,10 @@ CXXFLAGS += -fopenmp -DOPENMP
 endif
 
 ifeq ($(PYBIND),1)
-DEPEND_UBUNTU += python3 python3-numpy python3-pip
+DEPEND_UBUNTU += pybind11-dev python3-dev python3 python3-numpy python3-pip
 CXXFLAGS += -DRAI_PYBIND `python3-config --cflags`
 LIBS += `python3-config --ldflags`
-CPATH   := $(CPATH):$(BASE)/../pybind11/include::$(BASE)/../../pybind11/include
+CPATH   := $(CPATH):$(BASE)/../pybind11/include::$(HOME)/git/uni/masterarbeit/pybind11/include
 endif
 
 ifeq ($(X11),1)
@@ -193,7 +193,7 @@ endif
 ifeq ($(IT++),1)
 CXXFLAGS  += -DRAI_ITpp
 CPATH	  := $(CPATH):$(IT++)/include
-LPATH	  := $(LPATH):$(IT++)/lib
+LPATHS += $(IT++)/lib
 LIBS += -lit++ -lit++external -lg2c
 CygwinLibs+= -lit++ -lit++external -lg2c
 endif
@@ -255,16 +255,16 @@ DEPEND_UBUNTU += libopencv-dev
 endif
 
 ifeq ($(OPENCV4),1)
-CXXFLAGS  += -DRAI_OPENCV
+CXXFLAGS  += -DRAI_OPENCV 
 CPATH := $(HOME)/opt/include/opencv4/:$(CPATH)
-LPATH := $(HOME)/opt/lib:$(LPATH)
-LIBS += -lopencv_core -lopencv_highgui -lopencv_imgproc -lopencv_videoio
+LPATHS += $(HOME)/opt/lib
+LIBS += -lopencv_core -lopencv_highgui -lopencv_imgproc -lopencv_videoio -lopencv_tracking
 endif
 
 ifeq ($(HSL),1)
 CXXFLAGS  += -DRAI_HSL
 CPATH	  := $(CPATH):$(LIBPATH)/HSL-archive/include
-LPATH	  := $(LPATH):$(LIBPATH)/HSL-archive/lib
+LPATHS += $(LIBPATH)/HSL-archive/lib
 LIBS += -lHSL-debr
 endif
 
@@ -292,13 +292,18 @@ LPATHS += $(RAI_LIBPATH)/ibds/lib
 LIBS += -lDynamicSimulation -lCollisionDetection -lMath -lLibBulletCollision -lLibLinearMath -lqhull
 endif
 
+ifeq ($(OCTOMAP), 1)
+CPATH := $(CPATH):$(HOME)/opt/include/:
+LIBS += -loctomap -loctomath 
+endif
+
 ifeq ($(PCL),1)
 DEPEND_UBUNTU += libpcl-dev
 EIGEN = 1
-#QHULL = 1
-CXXFLAGS  +=  -DRAI_PCL -DEIGEN_USE_NEW_STDVECTOR -DEIGEN_YES_I_KNOW_SPARSE_MODULE_IS_NOT_STABLE_YET
-LIBS += -lpcl_keypoints -lpcl_visualization -lpcl_registration -lpcl_segmentation -lpcl_features -lpcl_surface -lpcl_tracking -lpcl_filters -lpcl_sample_consensus -lpcl_search -lpcl_kdtree -lpcl_octree -lpcl_common
-CPATH := $(CPATH):/usr/include/pcl-1.7:
+QHULL = 1
+#CXXFLAGS  +=  -DRAI_PCL -DEIGEN_USE_NEW_STDVECTOR -DEIGEN_YES_I_KNOW_SPARSE_MODULE_IS_NOT_STABLE_YET -march=native -msse4.2 -mfpmath=sse
+LIBS += -lpcl_io -lpcl_recognition -lpcl_people -lpcl_outofcore -lpcl_tracking -lpcl_keypoints -lpcl_visualization -lpcl_registration -lpcl_segmentation -lpcl_features -lpcl_surface -lpcl_tracking -lpcl_filters -lpcl_sample_consensus -lpcl_search -lpcl_kdtree -lpcl_octree -lpcl_common
+CPATH := $(CPATH):/usr/include/pcl-1.8:/usr/include/vtk-6.3/:
 
 #CPATH := $(CPATH):/opt/ros/$(ROS_VERSION)/include/pcl_ros:/usr/include/eigen3:/usr/include/pcl-1.7:
 #CPATH := $(CPATH):/usr/include/eigen3:/home/lib/include/pcl-1.7:
@@ -307,10 +312,53 @@ CPATH := $(CPATH):/usr/include/pcl-1.7:
 #FREENECT = 1
 endif
 
+ifeq ($(FILTERREG), 1)
+CPATH := $(CPATH):$(HOME)/git/uni/masterarbeit/poser/:/usr/local/cuda-10.1/include/:
+CPATH := $(CPATH):$(HOME)/git/uni/masterarbeit/poser/external/eigen3/:
+PCL19 = 1
+OPENCV4 = 1
+LPATHS += $(HOME)/git/uni/masterarbeit/poser/build/corr_search/
+LPATHS += $(HOME)/git/uni/masterarbeit/poser/build/corr_search/gmm/
+LPATHS += $(HOME)/git/uni/masterarbeit/poser/build/corr_search/nn_search/
+LPATHS += $(HOME)/git/uni/masterarbeit/poser/build/imgproc/
+LPATHS += $(HOME)/git/uni/masterarbeit/poser/build/ransac/
+LPATHS += $(HOME)/git/uni/masterarbeit/poser/build/common/
+LPATHS += $(HOME)/git/uni/masterarbeit/poser/build/geometry_utils/
+LPATHS += $(HOME)/git/uni/masterarbeit/poser/build/kinematic/
+LPATHS += $(HOME)/git/uni/masterarbeit/poser/build/kinematic/cpd/
+LPATHS += $(HOME)/git/uni/masterarbeit/poser/build/kinematic/rigid/
+LPATHS += $(HOME)/git/uni/masterarbeit/poser/build/kinematic/affine/
+LPATHS += $(HOME)/git/uni/masterarbeit/poser/build/cloudproc/
+#LPATHS += $(HOME)/git/uni/masterarbeit/poser/build/visualizer/
+LPATHS += /usr/local/cuda-10.1/lib64/
+# I copied all libs to $(HOME)/opt/lib/filterreg
+# -ldbg_visualizer_lib
+LIBS += -Wl,--whole-archive -lcloudproc_lib -lcommon_lib -lcorr_common_lib -lgeometry_utils_lib -limgproc_lib -lkinematic_base_lib -lransac_lib  -lgmm_corr_lib -lnn_search_lib -lrigid_kinematic_lib -lcpd_kinematic_lib -laffine_kinematic_lib -Wl,--no-whole-archive
+LIBS += -lglog -lcuda -lcublas -lcudart -lboost_filesystem -lboost_system#-lgtest
+endif
+
+ifeq ($(PCL19),1)
+#EIGEN_NEW = 1
+EIGEN = 1
+QHULL = 1
+CPATH := $(HOME)/opt/include/pcl-1.9/:$(CPATH)
+LPATHS += $(HOME)/opt/lib
+CXXFLAGS  +=  -DRAI_PCL -DEIGEN_USE_NEW_STDVECTOR -DEIGEN_YES_I_KNOW_SPARSE_MODULE_IS_NOT_STABLE_YET -march=native -msse4.2 -mfpmath=sse -O2
+LIBS += -lpcl_io -lpcl_recognition -lpcl_people -lpcl_outofcore -lpcl_tracking -lpcl_keypoints -lpcl_visualization -lpcl_registration -lpcl_segmentation -lpcl_features -lpcl_surface -lpcl_tracking -lpcl_filters -lpcl_sample_consensus -lpcl_search -lpcl_kdtree -lpcl_octree -lpcl_common
+CPATH := $(CPATH):/usr/include/vtk-6.3/:
+
+endif
+
 ifeq ($(EIGEN),1)
 DEPEND_UBUNTU += libeigen3-dev
 CXXFLAGS += -DRAI_EIGEN
 CPATH := $(CPATH):/usr/include/eigen3
+endif
+
+ifeq ($(EIGEN_NEW),1)
+DEPEND_UBUNTU += libeigen3-dev
+CXXFLAGS += -DRAI_EIGEN
+CPATH := $(CPATH):$(HOME)/opt/include/eigen3
 endif
 
 ifeq ($(HYBRID_AUTOMATON),1)
@@ -335,43 +383,43 @@ endif
 ifeq ($URGLASER),1)
 CPATH     := $(CPATH):$(LIBPATH)/urg-0.8.16/include/c
 CPATH     := $(CPATH):$(LIBPATH)/urg-0.8.16/include/cpp
-LPATH     := $(LPATH):$(LIBPATH)/urg-0.8.16/src/c/urg/.libs
-LPATH     := $(LPATH):$(LIBPATH)/urg-0.8.16/src/c/system/.libs
-LPATH     := $(LPATH):$(LIBPATH)/urg-0.8.16/src/c/connection/.libs
+LPATHS += $(LIBPATH)/urg-0.8.16/src/c/urg/.libs
+LPATHS += $(LIBPATH)/urg-0.8.16/src/c/system/.libs
+LPATHS += $(LIBPATH)/urg-0.8.16/src/c/connection/.libs
 LIBS += -lc_urg -lc_urg_system -lc_urg_connection
 endif
 
 ifeq ($(DYNAMIXEL),1)
 CXXFLAGS  += -DRAI_DYNAMIXEL
 CPATH     := $(CPATH):$(LIBPATH)/dynamixel/include
-LPATH     := $(LPATH):$(LIBPATH)/dynamixel/lib
+LPATHS += $(LIBPATH)/dynamixel/lib
 LIBS      += -ldxl
 endif
 
 ifeq ($(BUMBLE),1)
 CXXFLAGS  += -DRAI_BUMBLE
 #CPATH     := $(CPATH):$(LIBPATH)/pgrlibdcstereo/
-#LPATH     := $(LPATH):$(LIBPATH)/pgrlibdcstereo/
+#LPATHS += $(LIBPATH)/pgrlibdcstereo/
 LIBS += -ldc1394 # -lpgrlibdcstereo
 endif
 
 ifeq ($(FELZ),1)
 CXXFLAGS  += -DRAI_FELZ
 CPATH     := $(CPATH):$(LIBPATH)/libcolorseg/include
-LPATH     := $(LPATH):$(LIBPATH)/libcolorseg/lib
+LPATHS += $(LIBPATH)/libcolorseg/lib
 LIBS += -lcolorseg
 endif
 
 ifeq ($(ESS),1)
 CXXFLAGS  += -DRAI_ESS
 CPATH     := $(CPATH):$(LIBPATH)/blaschko-ESS-1.1/include
-LPATH     := $(LPATH):$(LIBPATH)/blaschko-ESS-1.1/lib
+LPATHS += $(LIBPATH)/blaschko-ESS-1.1/lib
 LIBS += -less
 endif
 
 ifeq ($(SURF),1)
 CPATH     := $(CPATH):$(LIBPATH)/opensurf/
-LPATH     := $(LPATH):$(LIBPATH)/opensurf/
+LPATHS += $(LIBPATH)/opensurf/
 LIBS += -lopensurf_$(ARCH)
 endif
 
@@ -380,11 +428,18 @@ CXXFLAGS  += -DRAI_PTHREAD
 LIBS += -lpthread
 endif
 
+ifeq ($(DART),1)
+CXXFLAGS += -DRAI_DART -std=c++14
+CPATH := $(CPATH):$(HOME)/git/dart/build:$(HOME)/git/dart
+LPATHS += $(HOME)/git/dart/build/lib
+LIBS += -ldart-gui -ldart-utils-urdf -ldart-utils -ldart -lboost_system
+endif
+
 ifeq ($(PHYSX),1)
 CXXFLAGS += -DRAI_PHYSX -D_DEBUG -DPX_DISABLE_FLUIDS -DCORELIB -DPX32 -DLINUX
 CPATH := $(CPATH):$(HOME)/opt/physx3.4/include:$(HOME)/opt/physx3.4/include/physx
 #PhysX/Include:$(RAI_LIBPATH)/PhysX/Include/extensions:$(RAI_LIBPATH)/PhysX/Include/foundation:$(RAI_LIBPATH)/PhysX/Include/deprecated
-LPATH := $(HOME)/opt/physx3.4/lib:$(LPATH)
+LPATHS += $(HOME)/opt/physx3.4/lib
 LIBS += -lpthread -lrt\
 -lPhysX3Extensions -lPhysX3_x64 -lPhysX3Cooking_x64 -lPhysX3Common_x64 -lPxFoundation_x64
 
@@ -409,7 +464,7 @@ ifeq ($(BULLET),1)
 #BULLET_PATH=$(HOME)/git/bullet3
 CXXFLAGS  += -DRAI_BULLET -DBT_USE_DOUBLE_PRECISION
 CPATH := $(HOME)/opt/include/bullet/:$(CPATH)
-LPATH := $(HOME)/opt/lib:$(LPATH)
+LPATHS += $(HOME)/opt/lib
 #LPATH := $(BULLET_PATH)/bin:$(LPATH)
 #CPATH := $(CPATH):$(BULLET_PATH)/src
 #btLIB = _gmake_x64_release

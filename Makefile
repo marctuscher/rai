@@ -1,3 +1,4 @@
+
 BASE = .
 
 target: src
@@ -6,7 +7,7 @@ DEPEND = $(shell find rai -mindepth 1 -maxdepth 1 -printf "%f ")
 
 ################################################################################
 
-src_paths =  $(shell find rai -mindepth 1 -maxdepth 1 -type d -not -name 'retired' -printf "%f ")
+src_paths =  $(shell find rai -mindepth 1 -maxdepth 3 -type d -not -name 'retired' -printf "%f ")
 
 test_paths = $(shell find test -mindepth 3 -maxdepth 3 -name 'Makefile' -printf "%h ")
 
@@ -19,6 +20,8 @@ installUbuntuAll: force
 	@find rai -mindepth 1 -maxdepth 1 -type d -exec make installUbuntu -C {} \;
 
 printUbuntuAll: $(DEPEND:%=inPath_printUbuntu/%) printUbuntu
+
+printDependAll: $(DEPEND:%=inPath_printDepend/%) printDepend
 
 tests: $(test_paths:%=inPath_make/%)
 
@@ -46,6 +49,11 @@ runTests: tests
 	@rm -f z.test-report
 	@find test -mindepth 2 -maxdepth 2 -type d \
 		-exec build/run-path.sh {} \;
+
+################################################################################
+
+deletePotentiallyNonfreeCode: force
+	@rm -Rf rai/Kin/SWIFT rai/Kin/SWIFT_decomposer rai/Geo/Lewiner
 
 ################################################################################
 
