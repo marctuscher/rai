@@ -95,7 +95,7 @@ CFLAGS += -fPIC
 
 ifndef RAI_NO_CXX11
 #CXXFLAGS += -std=c++0x
-CXXFLAGS += -std=c++14
+CXXFLAGS += -std=c++17
 endif
 
 ifndef OPTIM
@@ -103,7 +103,7 @@ OPTIM = debug
 endif
 
 ifeq ($(OPTIM),debug)
-CXXFLAGS := -DDEBUG -g -Wall -msse4.2 -mfpmath=sse -march=native $(CXXFLAGS)#-Wno-int-to-pointer-cast#-Wno-invalid-offsetof
+CXXFLAGS := -DDEBUG -g -Wall -march=native  -std=c++17 $(CXXFLAGS)#-Wno-int-to-pointer-cast#-Wno-invalid-offsetof
 endif
 ifeq ($(OPTIM),fast_debug)
 CXXFLAGS := -g -O3 -march=native -Wall $(CXXFLAGS)

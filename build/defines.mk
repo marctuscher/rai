@@ -20,7 +20,7 @@ ifeq ($(PYBIND),1)
 DEPEND_UBUNTU += pybind11-dev python3-dev python3 python3-numpy python3-pip
 CXXFLAGS += -DRAI_PYBIND `python3-config --cflags`
 LIBS += `python3-config --ldflags`
-CPATH   := $(CPATH):$(BASE)/../pybind11/include::$(BASE)/../../pybind11/include
+CPATH   := $(CPATH):$(BASE)/../pybind11/include::$(HOME)/git/uni/masterarbeit/pybind11/include
 endif
 
 ifeq ($(X11),1)
@@ -255,10 +255,10 @@ DEPEND_UBUNTU += libopencv-dev
 endif
 
 ifeq ($(OPENCV4),1)
-CXXFLAGS  += -DRAI_OPENCV
+CXXFLAGS  += -DRAI_OPENCV 
 CPATH := $(HOME)/opt/include/opencv4/:$(CPATH)
 LPATHS += $(HOME)/opt/lib
-LIBS += -lopencv_core -lopencv_highgui -lopencv_imgproc -lopencv_videoio
+LIBS += -lopencv_core -lopencv_highgui -lopencv_imgproc -lopencv_videoio -lopencv_tracking
 endif
 
 ifeq ($(HSL),1)
@@ -292,11 +292,16 @@ LPATHS += $(RAI_LIBPATH)/ibds/lib
 LIBS += -lDynamicSimulation -lCollisionDetection -lMath -lLibBulletCollision -lLibLinearMath -lqhull
 endif
 
+ifeq ($(OCTOMAP), 1)
+CPATH := $(CPATH):$(HOME)/opt/include/:
+LIBS += -loctomap -loctomath 
+endif
+
 ifeq ($(PCL),1)
 DEPEND_UBUNTU += libpcl-dev
 EIGEN = 1
 QHULL = 1
-CXXFLAGS  +=  -DRAI_PCL -DEIGEN_USE_NEW_STDVECTOR -DEIGEN_YES_I_KNOW_SPARSE_MODULE_IS_NOT_STABLE_YET -march=native -msse4.2 -mfpmath=sse
+#CXXFLAGS  +=  -DRAI_PCL -DEIGEN_USE_NEW_STDVECTOR -DEIGEN_YES_I_KNOW_SPARSE_MODULE_IS_NOT_STABLE_YET -march=native -msse4.2 -mfpmath=sse
 LIBS += -lpcl_io -lpcl_recognition -lpcl_people -lpcl_outofcore -lpcl_tracking -lpcl_keypoints -lpcl_visualization -lpcl_registration -lpcl_segmentation -lpcl_features -lpcl_surface -lpcl_tracking -lpcl_filters -lpcl_sample_consensus -lpcl_search -lpcl_kdtree -lpcl_octree -lpcl_common
 CPATH := $(CPATH):/usr/include/pcl-1.8:/usr/include/vtk-6.3/:
 
@@ -307,8 +312,34 @@ CPATH := $(CPATH):/usr/include/pcl-1.8:/usr/include/vtk-6.3/:
 #FREENECT = 1
 endif
 
+ifeq ($(FILTERREG), 1)
+CPATH := $(CPATH):$(HOME)/git/uni/masterarbeit/poser/:/usr/local/cuda-10.1/include/:
+CPATH := $(CPATH):$(HOME)/git/uni/masterarbeit/poser/external/eigen3/:
+PCL19 = 1
+OPENCV4 = 1
+LPATHS += $(HOME)/git/uni/masterarbeit/poser/build/corr_search/
+LPATHS += $(HOME)/git/uni/masterarbeit/poser/build/corr_search/gmm/
+LPATHS += $(HOME)/git/uni/masterarbeit/poser/build/corr_search/nn_search/
+LPATHS += $(HOME)/git/uni/masterarbeit/poser/build/imgproc/
+LPATHS += $(HOME)/git/uni/masterarbeit/poser/build/ransac/
+LPATHS += $(HOME)/git/uni/masterarbeit/poser/build/common/
+LPATHS += $(HOME)/git/uni/masterarbeit/poser/build/geometry_utils/
+LPATHS += $(HOME)/git/uni/masterarbeit/poser/build/kinematic/
+LPATHS += $(HOME)/git/uni/masterarbeit/poser/build/kinematic/cpd/
+LPATHS += $(HOME)/git/uni/masterarbeit/poser/build/kinematic/rigid/
+LPATHS += $(HOME)/git/uni/masterarbeit/poser/build/kinematic/affine/
+LPATHS += $(HOME)/git/uni/masterarbeit/poser/build/cloudproc/
+#LPATHS += $(HOME)/git/uni/masterarbeit/poser/build/visualizer/
+LPATHS += /usr/local/cuda-10.1/lib64/
+# I copied all libs to $(HOME)/opt/lib/filterreg
+# -ldbg_visualizer_lib
+LIBS += -Wl,--whole-archive -lcloudproc_lib -lcommon_lib -lcorr_common_lib -lgeometry_utils_lib -limgproc_lib -lkinematic_base_lib -lransac_lib  -lgmm_corr_lib -lnn_search_lib -lrigid_kinematic_lib -lcpd_kinematic_lib -laffine_kinematic_lib -Wl,--no-whole-archive
+LIBS += -lglog -lcuda -lcublas -lcudart -lboost_filesystem -lboost_system#-lgtest
+endif
+
 ifeq ($(PCL19),1)
-EIGEN_NEW = 1
+#EIGEN_NEW = 1
+EIGEN = 1
 QHULL = 1
 CPATH := $(HOME)/opt/include/pcl-1.9/:$(CPATH)
 LPATHS += $(HOME)/opt/lib

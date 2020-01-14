@@ -7,7 +7,7 @@ DEPEND = $(shell find rai -mindepth 1 -maxdepth 1 -printf "%f ")
 
 ################################################################################
 
-src_paths =  $(shell find rai -mindepth 1 -maxdepth 1 -type d -not -name 'retired' -printf "%f ")
+src_paths =  $(shell find rai -mindepth 1 -maxdepth 3 -type d -not -name 'retired' -printf "%f ")
 
 test_paths = $(shell find test -mindepth 3 -maxdepth 3 -name 'Makefile' -printf "%h ")
 
