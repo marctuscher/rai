@@ -1078,8 +1078,8 @@ template<class vert, class edge> void graphDelete(rai::Array<vert*>& V, rai::Arr
 template<class T> rai::Array<T> conv_stdvec2arr(const std::vector<T>& v) {
   return rai::Array<T>(&v.front(), v.size());
 }
-
-template<class T> std::vector<T> conv_arr2stdvec(const rai::Array<T>& x) {
+  
+ template<class T> std::vector<T> conv_arr2stdvec(const rai::Array<T>& x) {
   return std::vector<T>(x.begin(), x.end());
 }
 

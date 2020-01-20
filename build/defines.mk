@@ -258,7 +258,7 @@ ifeq ($(OPENCV4),1)
 CXXFLAGS  += -DRAI_OPENCV 
 CPATH := $(HOME)/opt/include/opencv4/:$(CPATH)
 LPATHS += $(HOME)/opt/lib
-LIBS += -lopencv_core -lopencv_highgui -lopencv_imgproc -lopencv_videoio -lopencv_tracking
+LIBS += -lopencv_core -lopencv_highgui -lopencv_imgproc -lopencv_videoio -lopencv_tracking -lopencv_reg
 endif
 
 ifeq ($(HSL),1)
@@ -295,6 +295,13 @@ endif
 ifeq ($(OCTOMAP), 1)
 CPATH := $(CPATH):$(HOME)/opt/include/:
 LIBS += -loctomap -loctomath 
+endif
+
+ifeq ($(ZMQ),1)
+# https://github.com/zeromq/zmqpp
+# https://github.com/zeromq/libzmq
+CPATH := $(HOME)/opt/include/:$(CPATH)
+LIBS += -lzmq
 endif
 
 ifeq ($(PCL),1)
