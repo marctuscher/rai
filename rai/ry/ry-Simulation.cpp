@@ -80,7 +80,10 @@ void init_Simulation(pybind11::module &m) {
        )
 
 
-      .def("getState", &rai::Simulation::getState)
+      .def("getState", [](std::shared_ptr<rai::Simulation>& self){
+        auto state = self->getState();
+        return pybind11::make_tuple(state->frameState, state->frameVels);
+      })
 
       .def("restoreState", &rai::Simulation::restoreState)
 
