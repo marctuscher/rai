@@ -203,7 +203,9 @@ FrameL rai::Frame::getPathToUpwardLink(bool untilPartBreak) {
     if(!untilPartBreak) {
       if(f->joint) break;
     } else {
-      if(f->joint && f->joint->getDimFromType()!=1 && !f->joint->mimic) break;
+      if(f->joint
+              && !(f->joint->type>=JT_hingeX && f->joint->type<=JT_hingeZ)
+              && !f->joint->mimic) break;
     }
     f = f->parent;
   }
@@ -437,6 +439,10 @@ void rai::Frame::setMass(double mass) {
   }else{
     getInertia().mass = mass;
   }
+}
+
+arr rai::Frame::getSize(){
+  return getShape().size;
 }
 
 arr rai::Frame::getMeshPoints() {
@@ -1089,6 +1095,12 @@ void rai::Shape::read(const Graph& ats) {
     else if(ats.get(fil, "mesh"))     {
       fil.cd_file();
       mesh().read(fil.getIs(), fil.name.getLastN(3).p, fil.name);
+//      cout <<"MESH: " <<mesh().V.dim() <<endl;
+    }
+    if(ats.get(fil, "texture"))     {
+      fil.cd_file();
+      read_png(mesh().texImg, fil.name, true);
+//      cout <<"TEXTURE: " <<mesh().texImg.dim() <<endl;
     }
     if(ats.get(d, "meshscale"))  { mesh().scale(d); }
     if(ats.get(x, "meshscale"))  { mesh().scale(x(0), x(1), x(2)); }

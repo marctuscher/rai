@@ -133,9 +133,15 @@ void KOMO::addTimeOptimization() {
   world.addTauJoint();
   ptr<Objective> o = addObjective({}, make_shared<TM_Time>(), OT_sos, {1e2}, {}, 1); //smooth time evolution
 #if 1 //break the constraint at phase switches:
-  CHECK(o->configs.nd==1 && o->configs.N==T, "");
-  CHECK_GE(stepsPerPhase, 10, "NIY")
-  for(uint t=2; t<o->configs.N; t+=stepsPerPhase) o->configs(t)=0;
+  if(o->configs.nd==1){ //for KOMO optimization
+      CHECK(o->configs.nd==1 && o->configs.N==T, "");
+      CHECK_GE(stepsPerPhase, 10, "NIY");
+      for(uint t=2; t<o->configs.N; t+=stepsPerPhase) o->configs(t)=0;
+  }else{ //for sparse optimization
+      CHECK(o->configs.nd==2 && o->configs.N==2*T, "");
+      CHECK_GE(stepsPerPhase, 10, "NIY");
+      for(uint t=o->configs.d0;t--;) if(o->configs(t,0)%stepsPerPhase==0) o->configs.delRows(t);
+  }
 #endif
 
   addObjective({}, make_shared<TM_Time>(), OT_sos, {1e-1}, {tau}); //prior on timing
@@ -150,6 +156,7 @@ void KOMO::addTimeOptimization() {
 void KOMO::clearObjectives() {
   objectives.clear(); //listDelete(objectives);
   listDelete(switches);
+  reset();
 }
 
 ptr<Objective> KOMO::addObjective(const arr& times,
@@ -394,7 +401,7 @@ void KOMO::addContact_slide(double startTime, double endTime, const char* from, 
   if(endTime>0.) addSwitch(endTime, false, new rai::KinematicSwitch(rai::SW_delContact, rai::JT_none, from, to, world));
 
   //constraints
-  addObjective({startTime, endTime}, make_shared<TM_Contact_ForceIsNormal>(world, from, to), OT_eq, {1e2});
+  addObjective({startTime, endTime}, make_shared<TM_Contact_ForceIsNormal>(world, from, to), OT_sos, {1e2});
   addObjective({startTime, endTime}, make_shared<TM_Contact_ForceIsPositive>(world, from, to), OT_ineq, {1e2});
   addObjective({startTime, endTime}, make_shared<TM_Contact_POAisInIntersection_InEq>(world, from, to), OT_ineq, {1e1});
   addObjective({startTime, endTime}, make_shared<F_PairCollision>(world, from, to, F_PairCollision::_negScalar, false), OT_eq, {1e1});
@@ -1426,12 +1433,12 @@ void KOMO::reset() {
   dense_problem.clear();
 }
 
-void KOMO::optimize(double addInitializationNoise) {
+void KOMO::optimize(double addInitializationNoise, const OptOptions options) {
   run_prepare(addInitializationNoise);
 
   if(verbose>0) reportProblem();
 
-  run();
+  run(options);
 }
 
 void KOMO::run_prepare(double addInitializationNoise) {
@@ -1782,7 +1789,7 @@ bool KOMO::displayTrajectory(double delay, bool watch, bool overlayPaths, const 
       if(delay<-10.) FILE("z.graph") <<K;
       gl->watch(timetag.p);
     } else {
-      gl->update(timetag.p);
+      gl->update(timetag.p, true);
       if(delay) rai::wait(delay * K.frames.first()->tau);
     }
     if(saveVideoPath) write_ppm(gl->captureImage, STRING(saveVideoPath<<std::setw(4)<<std::setfill('0')<<t<<".ppm"));
@@ -3259,11 +3266,13 @@ void KOMO::TimeSliceProblem::phi(arr& phi, arr& J, arr& H, ObjectiveTypeA& tt, c
 }
 
 rai::Configuration& KOMO::getConfiguration(double phase) {
+  if(!configurations.N) setupConfigurations();
   uint s = k_order + conv_time2step(phase, stepsPerPhase);
   return *configurations(s);
 }
 
 Configuration& KOMO::getConfiguration_t(int t){
+  if(!configurations.N) setupConfigurations();
   if(t<0) CHECK_LE(-t, (int)k_order,"");
   return *configurations(t+k_order);
 }

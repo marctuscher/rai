@@ -17,7 +17,7 @@ struct SimulationImp;
 struct Simulation {
   enum SimulatorEngine { _physx, _bullet, _kinematic };
   enum ControlMode { _none, _position, _velocity, _acceleration };
-  enum ImpType { _closeGripper, _openGripper, _depthNoise, _rgbNoise, _adversarialDropper };
+  enum ImpType { _closeGripper, _openGripper, _depthNoise, _rgbNoise, _adversarialDropper, _objectImpulses, _blockJoints };
 
   std::unique_ptr<struct Simulation_self> self;
 
@@ -28,7 +28,7 @@ struct Simulation {
   int verbose;
   FrameL grasps;
 
-  Simulation(Configuration& _C, SimulatorEngine _engine, int _verbose=1);
+  Simulation(Configuration& _C, SimulatorEngine _engine, int _verbose=2);
   ~Simulation();
 
 
@@ -38,8 +38,8 @@ struct Simulation {
   void step(const arr& u_control, double tau=.01, ControlMode u_mode = _velocity);
 
   //-- send a gripper command
-  void openGripper(const char* gripperFrameName, double width=.075, double speed=.2);
-  void closeGripper(const char* gripperFrameName, double width=.05, double speed=.1, double force=20.);
+  void openGripper(const char* gripperFrameName, double width=.075, double speed=.3);
+  void closeGripper(const char* gripperFrameName, double width=.05, double speed=.3, double force=20.);
 
   //-- get state information
   const arr& get_q(){ return C.getJointState(); }
@@ -51,13 +51,22 @@ struct Simulation {
   void getImageAndDepth(byteA& image, floatA& depth); ///< use this during stepping
   void getSegmentation(byteA& segmentation);
   CameraView& cameraview(); ///< use this if you want to initialize the sensor, etc
-  rai::CameraView::Sensor& addSensor(const char* frameAttached){ return cameraview().addSensor(frameAttached); }
+  rai::CameraView::Sensor& addSensor(const char* sensorName, const char* frameAttached=nullptr, uint width=640, uint height=360, double focalLength=-1., double orthoAbsHeight=-1., const arr& zRange= {}){
+    if(frameAttached && frameAttached[0]){
+      return cameraview().addSensor(sensorName, frameAttached, width, height, focalLength, orthoAbsHeight, zRange);
+    }else{
+      return cameraview().addSensor(sensorName);
+    }
+  }
+  rai::CameraView::Sensor&  selectSensor(const char* name) { return cameraview().selectSensor(name); }
 
+  //== ground truth interface
+  rai::Frame* getGroundTruthFrame(const char* frame){ return C.getFrameByName("frame"); }
 
   //== perturbation/adversarial interface
 
   //what are really the fundamental perturbations? Their (reactive?) management should be realized by 'agents'. We need a method to add purturbation agents.
-  void addImp(ImpType type, const arr& parameters);
+  void addImp(ImpType type, const StringA& frames, const arr& parameters);
 
   //displace object
 

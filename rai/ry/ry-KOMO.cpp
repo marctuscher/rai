@@ -74,6 +74,7 @@ pybind11::arg("order")=-1)
     pybind11::arg("scale")=double(1.),
     pybind11::arg("target")=std::vector<double>())
 
+.def("addSquaredQuaternionNorms", &KOMO::addSquaredQuaternionNorms)
 
 .def("add_StableRelativePose", [](std::shared_ptr<KOMO>& self, const std::vector<int>& confs, const char* gripper, const char* object) {
   for(uint i=1; i<confs.size(); i++)
@@ -126,7 +127,9 @@ pybind11::arg("object"))
 
 //-- run
 
-.def("optimize", &KOMO::optimize, "",
+.def("optimize", [](std::shared_ptr<KOMO>& self, double addInitializationNoise){
+  self->optimize(addInitializationNoise);
+      }, "",
      pybind11::arg("addInitializationNoise")=0.01)
 
 //-- reinitialize with configuration
@@ -163,7 +166,7 @@ pybind11::arg("object"))
 })
 
 .def("getReport", [](std::shared_ptr<KOMO>& self) {
-  rai::Graph G = self->getProblemGraph(true, false);
+  rai::Graph G = self->getProblemGraph(true);
   return graph2list(G);
 })
 

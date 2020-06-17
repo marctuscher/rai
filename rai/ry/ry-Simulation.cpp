@@ -4,6 +4,7 @@
 #include "ry-Simulation.h"
 #include "types.h"
 
+#include "../Kin/frame.h"
 #include "../Kin/simulation.h"
 #include "../Perception/depth2PointCloud.h"
 
@@ -38,14 +39,14 @@ void init_Simulation(pybind11::module &m) {
            "",
            pybind11::arg("gripperFrameName"),
            pybind11::arg("width") = .075,
-           pybind11::arg("speed") = .2
+           pybind11::arg("speed") = .3
                                     )
 
       .def("closeGripper", &rai::Simulation::closeGripper,
            "",
            pybind11::arg("gripperFrameName"),
            pybind11::arg("width") = .05,
-           pybind11::arg("speed") = 1.,
+           pybind11::arg("speed") = .3,
            pybind11::arg("force") = 20.
                                     )
 
@@ -74,11 +75,40 @@ void init_Simulation(pybind11::module &m) {
 //    return pybind11::array_t<byte>(seg.dim(), seg.p);
 //  })
 
-  .def("addSensor",  &rai::Simulation::addSensor,
-       "",
-       pybind11::arg("cameraFrameName")
-       )
+      .def("addSensor",  &rai::Simulation::addSensor,
+           "",
+           pybind11::arg("sensorName"),
+           pybind11::arg("frameAttached") = std::string(),
+           pybind11::arg("width") = 640,
+           pybind11::arg("height") = 360,
+           pybind11::arg("focalLength") = -1.,
+           pybind11::arg("orthoAbsHeight") = -1.,
+           pybind11::arg("zRange") = std::vector<double>()
+                                     )
+      .def("selectSensor",  &rai::Simulation::selectSensor,
+           "",
+           pybind11::arg("sensorName")
+           )
 
+  .def("getGroundTruthPosition", [](std::shared_ptr<rai::Simulation>& self, const char* frame) {
+    rai::Frame *f = self->C.getFrameByName(frame);
+    arr x = f->getPosition();
+    return pybind11::array_t<double>(x.dim(), x.p);
+  })
+
+  .def("getGroundTruthRotationMatrix", [](std::shared_ptr<rai::Simulation>& self, const char* frame) {
+    rai::Frame *f = self->C.getFrameByName(frame);
+    arr x = f->getRotationMatrix();
+    return pybind11::array_t<double>(x.dim(), x.p);
+  })
+
+  .def("getGroundTruthSize", [](std::shared_ptr<rai::Simulation>& self, const char* frame) {
+    rai::Frame *f = self->C.getFrameByName(frame);
+    arr x = f->getSize();
+    return pybind11::array_t<double>(x.dim(), x.p);
+  })
+
+      .def("addImp", &rai::Simulation::addImp)
 
       .def("getState", [](std::shared_ptr<rai::Simulation>& self){
         auto state = self->getState();
