@@ -272,7 +272,7 @@ void PhysXInterface::changeObjectType(rai::Frame* f, int _type){
 }
 
 
-void PhysXInterface::pushKinematicStates(const FrameL& frames) {
+void PhysXInterface::pushKinematicStates(const FrameL& frames, const arr& q_dot) {
   for(rai::Frame* f: frames) {
     if(self->actors.N <= f->ID) continue;
     if(f->ats.find<arr>("drive")) {
@@ -280,6 +280,10 @@ void PhysXInterface::pushKinematicStates(const FrameL& frames) {
         arr q = f->joint->calc_q_from_Q(f->joint->Q());
         cout << q << endl;
         joint->setDrivePosition(PxTransform(q.scalar(), 0.f, 0.f));
+        if(!!q_dot){
+          rai::Joint* jj = f->C.getJointByFrameNames(f->parent->name, f->name);
+          joint->setDriveVelocity(PxVec3(q_dot(jj->qIndex), 0., 0.), PxVec3(0., 0., 0.));
+        }
         continue;
     } 
     if(self->actorTypes(f->ID)==rai::BT_kinematic) {
@@ -426,6 +430,7 @@ void PhysXInterface_self::addJoint(rai::Joint* jj) {
 
       if(jj->frame->ats.find<arr>("drive")) {
         arr drive_values = jj->frame->ats.get<arr>("drive");
+        cout << "drive params: " << drive_values << endl;
         PxD6JointDrive drive(drive_values(0), drive_values(1), PX_MAX_F32, true);
         desc->setDrive(PxD6Drive::eX, drive);
       }
@@ -568,6 +573,7 @@ void PhysXInterface_self::addLink(rai::Frame* f, int verbose) {
       PxMaterial* mMaterial = defaultMaterial;
       double fric=-1.;
       if(s->frame.ats.get<double>(fric, "friction")) {
+        cout << "setting friction " << fric << " for frame" << f->name << endl; 
         mMaterial = physxSingleton().mPhysics->createMaterial(fric, fric, .1f);
       }
 
@@ -729,7 +735,7 @@ PhysXInterface::PhysXInterface(const rai::Configuration& C, bool verbose) : self
 PhysXInterface::~PhysXInterface() { NICO }
 
 void PhysXInterface::step(double tau) { NICO }
-void PhysXInterface::pushKinematicStates(const FrameL& frames) { NICO }
+void PhysXInterface::pushKinematicStates(const FrameL& frames, const arr& q_dot) { NICO }
 void PhysXInterface::pushFullState(const FrameL& frames, const arr& vels, bool onlyKinematic) { NICO }
 void PhysXInterface::pullDynamicStates(FrameL& frames, arr& vels) { NICO }
 

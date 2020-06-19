@@ -11,11 +11,11 @@ pybind11::class_<PhysXInterface, std::shared_ptr<PhysXInterface>>(m, "PhysXInter
 
 .def("step", &PhysXInterface::step)
 
-.def("step", [](PhysXInterface& self, ry::Config& C) {
-  self.pushKinematicStates(C.get()->frames);
-  self.step();
-  self.pullDynamicStates(C.set()->frames);
-})
+// .def("step", [](PhysXInterface& self, ry::Config& C) {
+//   self.pushKinematicStates(C.get()->frames);
+//   self.step();
+//   self.pullDynamicStates(C.set()->frames);
+// })
 
 .def("getState", [](PhysXInterface& self, ry::Config& C) {
   arr V;

@@ -152,7 +152,11 @@ void Simulation::step(const arr& u_control, double tau, ControlMode u_mode) {
 
   //-- call the physics ending
   if(engine==_physx) {
-    self->physx->pushKinematicStates(C.frames);
+    if (u_mode == _velocity){
+      self->physx->pushKinematicStates(C.frames, u_control);
+    }else{
+      self->physx->pushKinematicStates(C.frames);
+    }
     self->physx->step(tau);
     self->physx->pullDynamicStates(C.frames, self->frameVelocities);
   }else if(engine==_bullet){
