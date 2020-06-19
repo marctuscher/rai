@@ -159,6 +159,7 @@ PhysXInterface::PhysXInterface(const rai::Configuration& C, int verbose): self(n
   PxSceneDesc sceneDesc(physxSingleton().mPhysics->getTolerancesScale());
   sceneDesc.gravity = PxVec3(0.f, 0.f, -9.8f);
 
+
   if(!sceneDesc.cpuDispatcher) {
     PxDefaultCpuDispatcher* mCpuDispatcher = PxDefaultCpuDispatcherCreate(1);
     if(!mCpuDispatcher) {
@@ -199,9 +200,14 @@ PhysXInterface::PhysXInterface(const rai::Configuration& C, int verbose): self(n
   self->actors.resize(C.frames.N); self->actors.setZero();
   self->actorTypes.resize(C.frames.N); self->actorTypes.setZero();
   for(rai::Frame* a : C.frames) a->ensure_X();
-  FrameL links = C.getLinks();
-  for(rai::Frame* a : links) self->addLink(a, verbose);
-  //  for(rai::Joint *j : C.activeJoints) self->addJoint(j); //DONT ADD JOINTS!!!!
+  FrameL links = C.frames;
+  for (rai::Frame *a : links)
+  {
+    if (verbose > 0)
+      LOG(0) << "... trying to add link " << a->name;
+    self->addLink(a, verbose);
+  };
+  for(rai::Frame* a : links) if (a->joint) self->addJoint(a->joint); //DONT ADD JOINTS!!!!
 
   if(verbose>0) LOG(0) <<"... done creating Configuration within PhysX";
 
@@ -269,6 +275,13 @@ void PhysXInterface::changeObjectType(rai::Frame* f, int _type){
 void PhysXInterface::pushKinematicStates(const FrameL& frames) {
   for(rai::Frame* f: frames) {
     if(self->actors.N <= f->ID) continue;
+    if(f->ats.find<arr>("drive")) {
+        PxD6Joint* joint = self->joints(f->ID);
+        arr q = f->joint->calc_q_from_Q(f->joint->Q());
+        cout << q << endl;
+        joint->setDrivePosition(PxTransform(q.scalar(), 0.f, 0.f));
+        continue;
+    } 
     if(self->actorTypes(f->ID)==rai::BT_kinematic) {
       PxRigidActor* a = self->actors(f->ID);
       if(!a) continue; //f is not an actor
@@ -328,19 +341,20 @@ void PhysXInterface::setArticulatedBodiesKinematic(const rai::Configuration& C) 
  */
 
 void PhysXInterface_self::addJoint(rai::Joint* jj) {
-  HALT("REALLY?");
   while(joints.N <= jj->frame->ID)
     joints.append(nullptr);
 
-  //  cout <<"ADDING JOINT " <<jj->frame->parent->name <<'-' <<jj->frame->name <<endl;
+  if(!jj->frame->ats.find<arr>("drive")) return;
 
   rai::Transformation rel;
   rai::Frame* from = jj->frame->getUpwardLink(rel);
-
-  if(!jj->frame->inertia || !from || !from->inertia) return;
-  CHECK(jj->frame->inertia, "this joint belongs to a frame '" <<jj->frame->name <<"' without inertia");
-  CHECK(from, "this joint ('" <<jj->frame->name <<"') links from nullptr");
-  CHECK(from->inertia, "this joint ('" <<jj->frame->name <<"') links from a frame '" <<from->name <<"' without inertia");
+  cout <<"ADDING JOINT " <<jj->frame->parent->name <<'-' <<jj->frame->name <<endl;
+  if(from->inertia) cout << "INERTIAS: FROM is type '" << from ->inertia->type << "' and has mass " << from -> inertia -> mass << " matrix: " << from->inertia->matrix << endl;
+  if(jj->frame->inertia) cout << "INERTIAS: FRAME is type '" << jj -> frame->inertia->type << "' and has mass " << jj->frame->inertia->mass << " matrix: " << jj->frame->inertia->matrix << endl;
+  // if(!jj->frame->inertia || !from || !from->inertia) return;
+  // CHECK(jj->frame->inertia, "this joint belongs to a frame '" <<jj->frame->name <<"' without inertia");
+  // CHECK(from, "this joint ('" <<jj->frame->name <<"') links from nullptr");
+  // CHECK(from->inertia, "this joint ('" <<jj->frame->name <<"') links from a frame '" <<from->name <<"' without inertia");
 
   PxTransform A = conv_Transformation2PxTrans(rel);
   PxTransform B = Id_PxTrans();
@@ -351,11 +365,11 @@ void PhysXInterface_self::addJoint(rai::Joint* jj) {
     case rai::JT_hingeY:
     case rai::JT_hingeZ: {
 
-      PxD6Joint* desc = PxD6JointCreate(*physxSingleton().mPhysics, actors(from->ID), A, actors(jj->frame->ID), B.getInverse());
+      PxD6Joint* desc = PxD6JointCreate(*physxSingleton().mPhysics, actors(jj->frame->parent->ID), A, actors(jj->frame->ID), B.getInverse());
       CHECK(desc, "PhysX joint creation failed.");
-
       if(jj->frame->ats.find<arr>("drive")) {
         arr drive_values = jj->frame->ats.get<arr>("drive");
+        cout << drive_values << endl;
         PxD6JointDrive drive(drive_values(0), drive_values(1), PX_MAX_F32, true);
         desc->setDrive(PxD6Drive::eTWIST, drive);
       }
@@ -470,9 +484,11 @@ void PhysXInterface_self::addLink(rai::Frame* f, int verbose) {
   for(rai::Frame* p:parts) if(p->shape && p->getShape().type()!=rai::ST_marker) { hasShape=true; break; }
 
   //-- decide on the type
-  rai::BodyType type = rai::BT_static;
+  rai::BodyType type = rai::BT_kinematic;
   if(hasShape) {
-    if(f->joint)   type = rai::BT_kinematic;
+    if(f->joint)  { 
+      type = rai::BT_kinematic;
+    } 
     if(f->inertia) type = f->inertia->type;
   }
   actorTypes(f->ID) = type;
