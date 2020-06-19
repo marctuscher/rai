@@ -278,7 +278,6 @@ void PhysXInterface::pushKinematicStates(const FrameL& frames, const arr& q_dot)
     if(f->ats.find<arr>("drive")) {
         PxD6Joint* joint = self->joints(f->ID);
         arr q = f->joint->calc_q_from_Q(f->joint->Q());
-        cout << q << endl;
         joint->setDrivePosition(PxTransform(q.scalar(), 0.f, 0.f));
         if(!!q_dot){
           rai::Joint* jj = f->C.getJointByFrameNames(f->parent->name, f->name);
