@@ -283,53 +283,48 @@ void PhysXInterface::pushKinematicStates(const FrameL &frames, const arr &q_dot)
       continue;
     if (f->ats.find<arr>("drive"))
     {
-      rai::Transformation joint_tfm;
-      rai::Joint *jj = f->C.getJointByFrameNames(f->parent->name, f->name);
-      arr lin_vel(3);
-      lin_vel.setZero();
-      arr ang_vel(3);
-      ang_vel.setZero();
-      switch (f->joint->type)
-      {
-      case rai::JT_free: //do nothing
-        break;
-      case rai::JT_hingeX:
-      {
-        break;
-      }
-      case rai::JT_hingeY:
-      {
-        break;
-      }
-      case rai::JT_hingeZ:
-      {
-
-        break;
-      }
-      case rai::JT_rigid: break;
-      case rai::JT_transX:
-      {
-        joint_tfm = f->joint->Q();
-        if (!!q_dot)
+      PxD6Joint *joint = self->joints(f->ID);
+      joint->setDrivePosition(conv_Transformation2PxTrans(f->joint->Q()));
+      if(!!q_dot){
+        rai::Joint *jj = f->C.getJointByFrameNames(f->parent->name, f->name);
+        arr lin_vel(3);
+        lin_vel.setZero();
+        arr ang_vel(3);
+        ang_vel.setZero();
+        switch (f->joint->type)
+        {
+        case rai::JT_free: //do nothing
+          break;
+        case rai::JT_hingeX:
+        {
+          break;
+        }
+        case rai::JT_hingeY:
+        {
+          break;
+        }
+        case rai::JT_hingeZ:
+        {
+          break;
+        }
+        case rai::JT_rigid:
+          break;
+        case rai::JT_transX:
         {
           lin_vel(0) = q_dot(jj->qIndex);
+          break;
         }
-        break;
-      }
-      case rai::JT_transY:
-      {
-        break;
-      }
-      case rai::JT_transZ:
-      {
-        break;
-      }
-      default:
-        NIY;
-      }
-      PxD6Joint *joint = self->joints(f->ID);
-      joint->setDrivePosition(conv_Transformation2PxTrans(joint_tfm));
-      if(!!q_dot){
+        case rai::JT_transY:
+        {
+          break;
+        }
+        case rai::JT_transZ:
+        {
+          break;
+        }
+        default:
+          NIY;
+        }
         joint->setDriveVelocity(conv_arr2PxVec3(lin_vel), conv_arr2PxVec3(ang_vel));
       }
       continue;
