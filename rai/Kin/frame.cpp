@@ -1316,6 +1316,22 @@ void rai::Inertia::defaultInertiaByShape() {
     case ST_box:      inertiaBox(matrix.p(), mass, 1000., frame.shape->size(0), frame.shape->size(1), frame.shape->size(2));  break;
     case ST_capsule:
     case ST_cylinder: inertiaCylinder(matrix.p(), mass, 1000., frame.shape->size(-2), frame.shape->size(-1));  break;
+    case ST_mesh: {
+      arr inertia_arr;
+      if (frame.ats.get<arr>(inertia_arr, "inertia")){
+        double* mat = matrix.p();
+        mat[0] = inertia_arr(0);
+        mat[1] = mat[3]= -inertia_arr(1);
+        mat[2] = mat[6]= -inertia_arr(2);
+        mat[4] = inertia_arr(3);
+        mat[5] = mat[7] = -inertia_arr(4);
+        mat[8] = inertia_arr(5);
+      }
+      else{
+        HALT("Mass but no inertia supplied for mesh")
+      }
+      break;
+    }
     default: HALT("not implemented for this shape type");
   }
 }
