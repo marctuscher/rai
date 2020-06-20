@@ -82,6 +82,10 @@ arr conv_PxVec3_arr(const PxVec3& v) {
   return {v.x, v.y, v.z};
 }
 
+PxVec3 conv_arr2PxVec3(const arr& x){
+  return PxVec3(x(0), x(1), x(2));
+}
+
 // ============================================================================
 //stuff from Samples/PxToolkit
 
@@ -271,25 +275,72 @@ void PhysXInterface::changeObjectType(rai::Frame* f, int _type){
   self->actorTypes(f->ID) = type;
 }
 
+void PhysXInterface::pushKinematicStates(const FrameL &frames, const arr &q_dot)
+{
+  for (rai::Frame *f : frames)
+  {
+    if (self->actors.N <= f->ID)
+      continue;
+    if (f->ats.find<arr>("drive"))
+    {
+      rai::Transformation joint_tfm;
+      rai::Joint *jj = f->C.getJointByFrameNames(f->parent->name, f->name);
+      arr lin_vel(3);
+      lin_vel.setZero();
+      arr ang_vel(3);
+      ang_vel.setZero();
+      switch (f->joint->type)
+      {
+      case rai::JT_free: //do nothing
+        break;
+      case rai::JT_hingeX:
+      {
+        break;
+      }
+      case rai::JT_hingeY:
+      {
+        break;
+      }
+      case rai::JT_hingeZ:
+      {
 
-void PhysXInterface::pushKinematicStates(const FrameL& frames, const arr& q_dot) {
-  for(rai::Frame* f: frames) {
-    if(self->actors.N <= f->ID) continue;
-    if(f->ats.find<arr>("drive")) {
-        PxD6Joint* joint = self->joints(f->ID);
-        arr q = f->joint->calc_q_from_Q(f->joint->Q());
-        joint->setDrivePosition(PxTransform(q.scalar(), 0.f, 0.f));
-        if(!!q_dot){
-          rai::Joint* jj = f->C.getJointByFrameNames(f->parent->name, f->name);
-          joint->setDriveVelocity(PxVec3(q_dot(jj->qIndex), 0., 0.), PxVec3(0., 0., 0.));
+        break;
+      }
+      case rai::JT_rigid: break;
+      case rai::JT_transX:
+      {
+        joint_tfm = f->joint->Q();
+        if (!!q_dot)
+        {
+          lin_vel(0) = q_dot(jj->qIndex);
         }
-        continue;
-    } 
-    if(self->actorTypes(f->ID)==rai::BT_kinematic) {
-      PxRigidActor* a = self->actors(f->ID);
-      if(!a) continue; //f is not an actor
+        break;
+      }
+      case rai::JT_transY:
+      {
+        break;
+      }
+      case rai::JT_transZ:
+      {
+        break;
+      }
+      default:
+        NIY;
+      }
+      PxD6Joint *joint = self->joints(f->ID);
+      joint->setDrivePosition(conv_Transformation2PxTrans(joint_tfm));
+      if(!!q_dot){
+        joint->setDriveVelocity(conv_arr2PxVec3(lin_vel), conv_arr2PxVec3(ang_vel));
+      }
+      continue;
+    }
+    if (self->actorTypes(f->ID) == rai::BT_kinematic)
+    {
+      PxRigidActor *a = self->actors(f->ID);
+      if (!a)
+        continue; //f is not an actor
 
-      ((PxRigidDynamic*)a)->setKinematicTarget(conv_Transformation2PxTrans(f->ensure_X()));
+      ((PxRigidDynamic *)a)->setKinematicTarget(conv_Transformation2PxTrans(f->ensure_X()));
     }
   }
 }
