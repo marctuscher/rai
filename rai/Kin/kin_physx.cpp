@@ -293,22 +293,21 @@ void PhysXInterface::pushKinematicStates(const FrameL &frames, const arr &q_dot)
         ang_vel.setZero();
         switch (f->joint->type)
         {
-        case rai::JT_free: //do nothing
-          break;
         case rai::JT_hingeX:
         {
+          ang_vel(0) = q_dot(jj->qIndex);
           break;
         }
         case rai::JT_hingeY:
         {
+          ang_vel(1) = q_dot(jj->qIndex);
           break;
         }
         case rai::JT_hingeZ:
         {
+          ang_vel(2) = q_dot(jj->qIndex);
           break;
         }
-        case rai::JT_rigid:
-          break;
         case rai::JT_transX:
         {
           lin_vel(0) = q_dot(jj->qIndex);
@@ -316,14 +315,16 @@ void PhysXInterface::pushKinematicStates(const FrameL &frames, const arr &q_dot)
         }
         case rai::JT_transY:
         {
+          lin_vel(1) = q_dot(jj->qIndex);
           break;
         }
         case rai::JT_transZ:
         {
+          lin_vel(2) = q_dot(jj->qIndex);
           break;
         }
         default:
-          NIY;
+          continue;
         }
         joint->setDriveVelocity(conv_arr2PxVec3(lin_vel), conv_arr2PxVec3(ang_vel));
       }
