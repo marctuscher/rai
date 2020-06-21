@@ -204,7 +204,7 @@ PhysXInterface::PhysXInterface(const rai::Configuration& C, int verbose): self(n
   self->actors.resize(C.frames.N); self->actors.setZero();
   self->actorTypes.resize(C.frames.N); self->actorTypes.setZero();
   for(rai::Frame* a : C.frames) a->ensure_X();
-  FrameL links = C.frames;
+  FrameL links = C.getLinks();
   for (rai::Frame *a : links)
   {
     if (verbose > 0)
@@ -335,7 +335,6 @@ void PhysXInterface::pushKinematicStates(const FrameL &frames, const arr &q_dot)
       PxRigidActor *a = self->actors(f->ID);
       if (!a)
         continue; //f is not an actor
-
       ((PxRigidDynamic *)a)->setKinematicTarget(conv_Transformation2PxTrans(f->ensure_X()));
     }
   }
@@ -397,15 +396,16 @@ void PhysXInterface_self::addJoint(rai::Joint* jj) {
   if(!jj->frame->ats.find<arr>("drive")) return;
 
   rai::Transformation rel;
-  rai::Frame* from = jj->frame->getUpwardLink(rel);
-  cout <<"ADDING JOINT " <<jj->frame->parent->name <<'-' <<jj->frame->name <<endl;
+  rai::Frame* from = jj->frame->parent->getUpwardLink(rel);
+  cout << "joint_frame: " << jj->frame->name << " upward link: " << from->name << endl;
+  cout <<"ADDING JOINT " << from->name <<'-' <<jj->frame->name <<endl;
   if(from->inertia) cout << "INERTIAS: FROM is type '" << from ->inertia->type << "' and has mass " << from -> inertia -> mass << " matrix: " << from->inertia->matrix << endl;
   if(jj->frame->inertia) cout << "INERTIAS: FRAME is type '" << jj -> frame->inertia->type << "' and has mass " << jj->frame->inertia->mass << " matrix: " << jj->frame->inertia->matrix << endl;
   // if(!jj->frame->inertia || !from || !from->inertia) return;
   // CHECK(jj->frame->inertia, "this joint belongs to a frame '" <<jj->frame->name <<"' without inertia");
   // CHECK(from, "this joint ('" <<jj->frame->name <<"') links from nullptr");
   // CHECK(from->inertia, "this joint ('" <<jj->frame->name <<"') links from a frame '" <<from->name <<"' without inertia");
-
+  cout << "TRANSFORMATION: " << rel << endl;
   PxTransform A = conv_Transformation2PxTrans(rel);
   PxTransform B = Id_PxTrans();
   switch(jj->type) {
@@ -415,7 +415,7 @@ void PhysXInterface_self::addJoint(rai::Joint* jj) {
     case rai::JT_hingeY:
     case rai::JT_hingeZ: {
 
-      PxD6Joint* desc = PxD6JointCreate(*physxSingleton().mPhysics, actors(jj->frame->parent->ID), A, actors(jj->frame->ID), B.getInverse());
+      PxD6Joint* desc = PxD6JointCreate(*physxSingleton().mPhysics, actors(from->ID), A, actors(jj->frame->ID), B.getInverse());
       CHECK(desc, "PhysX joint creation failed.");
       if(jj->frame->ats.find<arr>("drive")) {
         arr drive_values = jj->frame->ats.get<arr>("drive");
@@ -449,7 +449,7 @@ void PhysXInterface_self::addJoint(rai::Joint* jj) {
     break;
     case rai::JT_rigid: {
       // PxFixedJoint* desc =
-      PxFixedJointCreate(*physxSingleton().mPhysics, actors(jj->from()->ID), A, actors(jj->frame->ID), B.getInverse());
+      PxFixedJointCreate(*physxSingleton().mPhysics, actors(from->ID), A, actors(jj->frame->ID), B.getInverse());
       // desc->setProjectionLinearTolerance(1e10);
       // desc->setProjectionAngularTolerance(3.14);
     }
@@ -458,7 +458,7 @@ void PhysXInterface_self::addJoint(rai::Joint* jj) {
       break;
     }
     case rai::JT_transXYPhi: {
-      PxD6Joint* desc = PxD6JointCreate(*physxSingleton().mPhysics, actors(jj->from()->ID), A, actors(jj->frame->ID), B.getInverse());
+      PxD6Joint* desc = PxD6JointCreate(*physxSingleton().mPhysics, actors(from->ID), A, actors(jj->frame->ID), B.getInverse());
       CHECK(desc, "PhysX joint creation failed.");
 
       desc->setMotion(PxD6Axis::eX, PxD6Motion::eFREE);
@@ -471,7 +471,7 @@ void PhysXInterface_self::addJoint(rai::Joint* jj) {
     case rai::JT_transX:
     case rai::JT_transY:
     case rai::JT_transZ: {
-      PxD6Joint* desc = PxD6JointCreate(*physxSingleton().mPhysics, actors(jj->from()->ID), A, actors(jj->frame->ID), B.getInverse());
+      PxD6Joint* desc = PxD6JointCreate(*physxSingleton().mPhysics, actors(from->ID), A, actors(jj->frame->ID), B.getInverse());
       CHECK(desc, "PhysX joint creation failed.");
 
       if(jj->frame->ats.find<arr>("drive")) {
@@ -535,7 +535,7 @@ void PhysXInterface_self::addLink(rai::Frame* f, int verbose) {
   for(rai::Frame* p:parts) if(p->shape && p->getShape().type()!=rai::ST_marker) { hasShape=true; break; }
 
   //-- decide on the type
-  rai::BodyType type = rai::BT_kinematic;
+  rai::BodyType type = rai::BT_static;
   if(hasShape) {
     if(f->joint)  { 
       type = rai::BT_kinematic;
