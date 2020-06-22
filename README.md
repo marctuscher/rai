@@ -1,3 +1,5 @@
+This branch aims to incorporate PhysX 4.1 to enhance physic simulation for RL, controlled by rai.
+
 # RAI bare code
 
 This repo contains core sources related to Robotic AI. First users are
