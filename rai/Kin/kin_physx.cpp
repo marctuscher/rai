@@ -38,10 +38,9 @@ struct PhysXSingleton{
   PxSimulationFilterShader gDefaultFilterShader=PxDefaultSimulationFilterShader;
 
   void create(){
-    mFoundation = PxCreateFoundation(PX_FOUNDATION_VERSION, gDefaultAllocatorCallback, gDefaultErrorCallback);
+    mFoundation = PxCreateFoundation(PX_PHYSICS_VERSION, gDefaultAllocatorCallback, gDefaultErrorCallback);
     mPhysics = PxCreatePhysics(PX_PHYSICS_VERSION, *mFoundation, PxTolerancesScale());
     PxCookingParams cookParams(mPhysics->getTolerancesScale());
-    cookParams.skinWidth = .001f;
     mCooking = PxCreateCooking(PX_PHYSICS_VERSION, *mFoundation, cookParams);
     if(!mCooking) HALT("PxCreateCooking failed!");
     if(!mPhysics) HALT("Error creating PhysX3 device.");
@@ -192,7 +191,8 @@ PhysXInterface::PhysXInterface(const rai::Configuration& C, int verbose): self(n
   PxRigidStatic* plane = physxSingleton().mPhysics->createRigidStatic(pose);
   CHECK(plane, "create plane failed!");
 
-  PxShape* planeShape = plane->createShape(PxPlaneGeometry(), *self->defaultMaterial);
+  PxShape *planeShape = physxSingleton().mPhysics->createShape(PxPlaneGeometry(), *self->defaultMaterial, true);
+  plane->attachShape(*planeShape);
   CHECK(planeShape, "create shape failed!");
   self->gScene->addActor(*plane);
 
@@ -328,6 +328,8 @@ void PhysXInterface::pushKinematicStates(const FrameL &frames, const arr &q_dot)
         }
         joint->setDriveVelocity(conv_arr2PxVec3(lin_vel), conv_arr2PxVec3(ang_vel));
       }
+      // cout << "Drive velocity: " << joint->getDriveVelocity() << endl;
+      // cout << "Drive position: " << joint->getDrivePosition() << endl;
       continue;
     }
     if (self->actorTypes(f->ID) == rai::BT_kinematic)
@@ -398,14 +400,9 @@ void PhysXInterface_self::addJoint(rai::Joint* jj) {
   rai::Transformation rel;
   rai::Frame* from = jj->frame->parent->getUpwardLink(rel);
   cout << "joint_frame: " << jj->frame->name << " upward link: " << from->name << endl;
+
   cout <<"ADDING JOINT " << from->name <<'-' <<jj->frame->name <<endl;
-  if(from->inertia) cout << "INERTIAS: FROM is type '" << from ->inertia->type << "' and has mass " << from -> inertia -> mass << " matrix: " << from->inertia->matrix << endl;
-  if(jj->frame->inertia) cout << "INERTIAS: FRAME is type '" << jj -> frame->inertia->type << "' and has mass " << jj->frame->inertia->mass << " matrix: " << jj->frame->inertia->matrix << endl;
-  // if(!jj->frame->inertia || !from || !from->inertia) return;
-  // CHECK(jj->frame->inertia, "this joint belongs to a frame '" <<jj->frame->name <<"' without inertia");
-  // CHECK(from, "this joint ('" <<jj->frame->name <<"') links from nullptr");
-  // CHECK(from->inertia, "this joint ('" <<jj->frame->name <<"') links from a frame '" <<from->name <<"' without inertia");
-  cout << "TRANSFORMATION: " << rel << endl;
+
   PxTransform A = conv_Transformation2PxTrans(rel);
   PxTransform B = Id_PxTrans();
   switch(jj->type) {
@@ -417,14 +414,10 @@ void PhysXInterface_self::addJoint(rai::Joint* jj) {
 
       PxD6Joint* desc = PxD6JointCreate(*physxSingleton().mPhysics, actors(from->ID), A, actors(jj->frame->ID), B.getInverse());
       CHECK(desc, "PhysX joint creation failed.");
-      if(jj->frame->ats.find<arr>("drive")) {
-        arr drive_values = jj->frame->ats.get<arr>("drive");
-        cout << drive_values << endl;
-        PxD6JointDrive drive(drive_values(0), drive_values(1), PX_MAX_F32, true);
-        desc->setDrive(PxD6Drive::eTWIST, drive);
-      }
 
-      if(jj->frame->ats.find<arr>("limit")) {
+      if (false){
+
+      // if(jj->frame->ats.find<arr>("limit")) {
         desc->setMotion(PxD6Axis::eTWIST, PxD6Motion::eLIMITED);
 
         arr limits = jj->frame->ats.get<arr>("limit");
@@ -440,9 +433,8 @@ void PhysXInterface_self::addJoint(rai::Joint* jj) {
 
       if(jj->frame->ats.find<arr>("drive")) {
         arr drive_values = jj->frame->ats.get<arr>("drive");
-        PxD6JointDrive drive(drive_values(0), drive_values(1), PX_MAX_F32, false);
-        desc->setDrive(PxD6Drive::eTWIST, drive);
-        //desc->setDriveVelocity(PxVec3(0, 0, 0), PxVec3(5e-1, 0, 0));
+        PxD6JointDrive drive(drive_values(0), drive_values(1), PX_MAX_F32, true);
+        desc->setDrive(PxD6Drive::eSWING, drive);
       }
       joints(jj->frame->ID) = desc;
     }
@@ -476,7 +468,6 @@ void PhysXInterface_self::addJoint(rai::Joint* jj) {
 
       if(jj->frame->ats.find<arr>("drive")) {
         arr drive_values = jj->frame->ats.get<arr>("drive");
-        cout << "drive params: " << drive_values << endl;
         PxD6JointDrive drive(drive_values(0), drive_values(1), PX_MAX_F32, true);
         desc->setDrive(PxD6Drive::eX, drive);
       }
@@ -541,6 +532,11 @@ void PhysXInterface_self::addLink(rai::Frame* f, int verbose) {
       type = rai::BT_kinematic;
     } 
     if(f->inertia) type = f->inertia->type;
+  }else{
+    // for rigid joints. TODO danger!
+    if (f->joint) {
+      type=rai::BT_dynamic;
+    }
   }
   actorTypes(f->ID) = type;
   if(verbose>0) LOG(0) <<"adding link anchored at '" <<f->name <<"' as " <<rai::Enum<rai::BodyType>(type);
@@ -604,7 +600,7 @@ void PhysXInterface_self::addLink(rai::Frame* f, int verbose) {
         copy(Vfloat, s->mesh().V); //convert vertices from double to float array..
         PxConvexMesh* triangleMesh = PxToolkit::createConvexMesh(
                                        *physxSingleton().mPhysics, *physxSingleton().mCooking, (PxVec3*)Vfloat.p, Vfloat.d0,
-                                       PxConvexFlag::eCOMPUTE_CONVEX | PxConvexFlag::eINFLATE_CONVEX);
+                                       PxConvexFlag::eCOMPUTE_CONVEX);
         geometry = new PxConvexMeshGeometry(triangleMesh);
       } break;
       case rai::ST_marker: {
@@ -622,8 +618,8 @@ void PhysXInterface_self::addLink(rai::Frame* f, int verbose) {
         cout << "setting friction " << fric << " for frame" << f->name << endl; 
         mMaterial = physxSingleton().mPhysics->createMaterial(fric, fric, .1f);
       }
-
-      PxShape* shape = actor->createShape(*geometry, *mMaterial);
+      PxShape* shape = physxSingleton().mPhysics->createShape(*geometry, *mMaterial, true);
+      actor->attachShape(*shape);
       if(&s->frame!=f) {
         if(s->frame.parent==f) {
           shape->setLocalPose(conv_Transformation2PxTrans(s->frame.get_Q()));

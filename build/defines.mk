@@ -441,6 +441,30 @@ LIBS += -lpthread -lrt\
 -lSimulationController 
 endif
 
+ifeq ($(PHYSX4),1)
+CXXFLAGS += -DRAI_PHYSX -D_DEBUG -DPX_DISABLE_FLUIDS -DCORELIB -DPX32 -DLINUX
+CPATH := $(CPATH):$(HOME)/opt/physx/include:$(HOME)/opt/physx/include/physx
+#PhysX/Include:$(RAI_LIBPATH)/PhysX/Include/extensions:$(RAI_LIBPATH)/PhysX/Include/foundation:$(RAI_LIBPATH)/PhysX/Include/deprecated
+LPATHS += $(HOME)/opt/physx/lib
+LIBS += -Wl,--whole-archive -lPhysXCharacterKinematic_static_64 -lPhysXCommon_static_64 -lPhysXCooking_static_64 -lPhysXExtensions_static_64 -lPhysXFoundation_static_64 -lPhysX_static_64 -lPhysXVehicle_static_64 -lPhysXPvdSDK_static_64 -Wl,--no-whole-archive -lpthread -lrt
+
+#Physx-3.3:
+#-lLowLevel \
+-lLowLevelCloth \
+-lPhysX3CharacterKinematic \
+-lPhysX3 \
+-lPhysX3Common \
+-lPhysX3Cooking \
+-lPhysX3Extensions \
+-lPhysX3Vehicle \
+-lPhysXProfileSDK \
+-lPhysXVisualDebuggerSDK \
+-lPvdRuntime \
+-lPxTask \
+-lSceneQuery \
+-lSimulationController 
+endif
+
 ifeq ($(BULLET),1)
 #BULLET_PATH=$(HOME)/git/bullet3
 CXXFLAGS  += -DRAI_BULLET -DBT_USE_DOUBLE_PRECISION

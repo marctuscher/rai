@@ -183,7 +183,6 @@ FrameL rai::Frame::getPathToRoot() {
 rai::Frame* rai::Frame::getUpwardLink(rai::Transformation& Qtotal, bool untilPartBreak) const {
   if(!!Qtotal) Qtotal.setZero();
   const Frame* f=this;
-  cout << "getting upward link for" << f->name << endl; 
   while(f->parent) {
     if(!untilPartBreak) {
       if(f->joint) break;

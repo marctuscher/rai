@@ -5,7 +5,7 @@ OUTPUT = lib$(NAME).so
 OPTIM = fast_debug
 
 GL = 1
-PHYSX = 1
+PHYSX4 = 1
 BULLET = 1
 ODE = 0
 SWIFT = 1
