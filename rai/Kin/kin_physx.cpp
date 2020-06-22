@@ -18,6 +18,7 @@
 #include <physx/extensions/PxShapeExt.h>
 #include <physx/foundation/PxMat33.h>
 #include <physx/PxArticulationBase.h>
+#include <physx/PxArticulationJoint.h>
 #include <physx/PxArticulationReducedCoordinate.h>
 //#include <physx/pvd/PxVisualDebugger.h>
 //#include <physx/physxvisualdebuggersdk/PvdConnectionFlags.h>
@@ -283,68 +284,51 @@ void PhysXInterface::pushKinematicStates(const FrameL &frames, const arr &q_dot)
 {
   for (rai::Frame *f : frames)
   {
-    if (self->actors.N <= f->ID)
- 
+    cout << "FRAME: " << f->name << endl;
+    if (self->joints.N <= f->ID)
       continue;
-#if 0
     if (f->ats.find<arr>("drive"))
     {
-      PxArticulatedJoint *joint = self->joints(f->ID);
-      joint->setDrivePosition(conv_Transformation2PxTrans(f->joint->Q()));
-      if(!!q_dot){
-        rai::Joint *jj = f->C.getJointByFrameNames(f->parent->name, f->name);
-        arr lin_vel(3);
-        lin_vel.setZero();
-        arr ang_vel(3);
-        ang_vel.setZero();
-        switch (f->joint->type)
+    cout << "Getting joint" << endl;
+      PxArticulationJointReducedCoordinate *joint = self->joints(f->ID);
+    cout << "Calc" << endl;
+      arr q = f->joint->calc_q_from_Q(f->joint->Q());
+      cout << "JOINT: " << joint << endl;
+      switch (f->joint->type)
+      {
+      case rai::JT_hingeX:
+      case rai::JT_hingeY:
+      case rai::JT_hingeZ:
+      {
+        cout << "set target" << endl;
+        joint->setDriveTarget(PxArticulationAxis::eTWIST, PxReal(1.0f));
+        if (!!q_dot)
         {
-        case rai::JT_hingeX:
-        {
-          ang_vel(0) = q_dot(jj->qIndex);
-          break;
+        cout << "set vel" << endl;
+          joint->setDriveVelocity(PxArticulationAxis::eTWIST, q_dot(f->joint->qIndex));
         }
-        case rai::JT_hingeY:
-        {
-          ang_vel(1) = q_dot(jj->qIndex);
-          break;
-        }
-        case rai::JT_hingeZ:
-        {
-          ang_vel(2) = q_dot(jj->qIndex);
-          break;
-        }
-        case rai::JT_transX:
-        {
-          lin_vel(0) = q_dot(jj->qIndex);
-          break;
-        }
-        case rai::JT_transY:
-        {
-          lin_vel(1) = q_dot(jj->qIndex);
-          break;
-        }
-        case rai::JT_transZ:
-        {
-          lin_vel(2) = q_dot(jj->qIndex);
-          break;
-        }
-        default:
-          continue;
-        }
-        joint->setDriveVelocity(conv_arr2PxVec3(lin_vel), conv_arr2PxVec3(ang_vel));
+        break;
       }
-      // cout << "Drive velocity: " << joint->getDriveVelocity() << endl;
-      // cout << "Drive position: " << joint->getDrivePosition() << endl;
-      continue;
-    }
-#endif
-    if (self->actorTypes(f->ID) == rai::BT_kinematic)
-    {
-      PxRigidActor *a = self->actors(f->ID);
-      if (!a)
-        continue; //f is not an actor
-      ((PxRigidDynamic *)a)->setKinematicTarget(conv_Transformation2PxTrans(f->ensure_X()));
+      case rai::JT_transX:
+      {
+        joint->setDriveTarget(PxArticulationAxis::eX, PxReal(1.0f));
+        if (!!q_dot)
+        {
+          joint->setDriveVelocity(PxArticulationAxis::eX, q_dot(f->joint->qIndex));
+        }
+        break;
+      }
+      case rai::JT_transY:
+      {
+        break;
+      }
+      case rai::JT_transZ:
+      {
+        break;
+      }
+      default:
+        continue;
+      }
     }
   }
 }
