@@ -17,6 +17,8 @@
 #include <physx/extensions/PxDefaultCpuDispatcher.h>
 #include <physx/extensions/PxShapeExt.h>
 #include <physx/foundation/PxMat33.h>
+#include <physx/PxArticulationBase.h>
+#include <physx/PxArticulationReducedCoordinate.h>
 //#include <physx/pvd/PxVisualDebugger.h>
 //#include <physx/physxvisualdebuggersdk/PvdConnectionFlags.h>
 //#include <PxMat33Legacy.h>
@@ -130,7 +132,7 @@ struct PhysXInterface_self {
   PxScene* gScene = nullptr;
   rai::Array<PxRigidActor*> actors;
   rai::Array<rai::BodyType> actorTypes;
-  rai::Array<PxD6Joint*> joints;
+  rai::Array<PxArticulationJointReducedCoordinate*> joints;
   OpenGL* gl=nullptr;
   rai::Configuration* C=nullptr;
 
@@ -141,6 +143,7 @@ struct PhysXInterface_self {
 //  debugger::comm::PvdConnection* connection = nullptr;
 
   void addLink(rai::Frame* b, int verbose);
+  void addArticulatedLinks(FrameL links, int verbose);
   void addJoint(rai::Joint* jj);
 
   void lockJoint(PxD6Joint* joint, rai::Joint* rai_joint);
@@ -207,11 +210,12 @@ PhysXInterface::PhysXInterface(const rai::Configuration& C, int verbose): self(n
   FrameL links = C.getLinks();
   for (rai::Frame *a : links)
   {
-    if (verbose > 0)
-      LOG(0) << "... trying to add link " << a->name;
-    self->addLink(a, verbose);
+    if (!a->ats.find<double>("articulated")){
+      self->addLink(a, verbose);
+    }
   };
-  for(rai::Frame* a : links) if (a->joint) self->addJoint(a->joint); //DONT ADD JOINTS!!!!
+  self->addArticulatedLinks(links, verbose);
+  // for(rai::Frame* a : links) if (a->joint) self->addJoint(a->joint); //DONT ADD JOINTS!!!!
 
   if(verbose>0) LOG(0) <<"... done creating Configuration within PhysX";
 
@@ -280,10 +284,12 @@ void PhysXInterface::pushKinematicStates(const FrameL &frames, const arr &q_dot)
   for (rai::Frame *f : frames)
   {
     if (self->actors.N <= f->ID)
+ 
       continue;
+#if 0
     if (f->ats.find<arr>("drive"))
     {
-      PxD6Joint *joint = self->joints(f->ID);
+      PxArticulatedJoint *joint = self->joints(f->ID);
       joint->setDrivePosition(conv_Transformation2PxTrans(f->joint->Q()));
       if(!!q_dot){
         rai::Joint *jj = f->C.getJointByFrameNames(f->parent->name, f->name);
@@ -332,6 +338,7 @@ void PhysXInterface::pushKinematicStates(const FrameL &frames, const arr &q_dot)
       // cout << "Drive position: " << joint->getDrivePosition() << endl;
       continue;
     }
+#endif
     if (self->actorTypes(f->ID) == rai::BT_kinematic)
     {
       PxRigidActor *a = self->actors(f->ID);
@@ -390,7 +397,7 @@ void PhysXInterface::setArticulatedBodiesKinematic(const rai::Configuration& C) 
  * - setup some physx stuff
  * - create PhysX equivalent to the Configuration
  */
-
+#if 0
 void PhysXInterface_self::addJoint(rai::Joint* jj) {
   while(joints.N <= jj->frame->ID)
     joints.append(nullptr);
@@ -493,6 +500,205 @@ void PhysXInterface_self::addJoint(rai::Joint* jj) {
       NIY;
   }
 }
+#endif
+
+void PhysXInterface_self::addArticulatedLinks(FrameL links, int verbose){
+  PxArticulationReducedCoordinate* articulation = physxSingleton().mPhysics->createArticulationReducedCoordinate();
+
+  // assuming that links are ordered
+  PxArticulationLink *parent = NULL;
+
+  for (rai::Frame* f: links){
+    if (!f->ats.find<double>("articulated")){
+      continue;
+    }
+    while (joints.N <= f->ID)
+      joints.append(nullptr);
+
+    if (verbose > 0)
+      LOG(0) << "ADDING ARTICULATED LINK FOR FRAME " << f->name;
+
+    FrameL parts = {f};
+    f->getRigidSubFrames(parts);
+
+    PxArticulationLink *link = articulation->createLink(parent, conv_Transformation2PxTrans(f->ensure_X()));
+
+    for (rai::Frame *p : parts)
+    {
+      rai::Shape *s = p->shape;
+      if (!s)
+        continue;
+      if (s->frame.name.startsWith("coll_"))
+        continue; //these are the 'pink' collision boundary shapes..
+      PxGeometry *geometry;
+      switch (s->type())
+      {
+      case rai::ST_box:
+      {
+        geometry = new PxBoxGeometry(.5 * s->size(0), .5 * s->size(1), .5 * s->size(2));
+      }
+      break;
+      case rai::ST_sphere:
+      {
+        geometry = new PxSphereGeometry(s->size(-1));
+      }
+      break;
+        //      case rai::ST_capsule: {
+        //        geometry = new PxCapsuleGeometry(s->size(-1), .5*s->size(-2));
+        //      }
+        //      break;
+      case rai::ST_capsule:
+      case rai::ST_cylinder:
+      case rai::ST_ssBox:
+      case rai::ST_ssCvx:
+      case rai::ST_mesh:
+      {
+        // Note: physx can't decompose meshes itself.
+        // Physx doesn't support triangle meshes in dynamic objects! See:
+        // file:///home/mtoussai/lib/PhysX/Documentation/PhysXGuide/Manual/Shapes.html
+        // We have to decompose the meshes "by hand" and feed them to PhysX.
+
+        // PhysX uses float for the vertices
+        floatA Vfloat;
+
+        Vfloat.clear();
+        copy(Vfloat, s->mesh().V); //convert vertices from double to float array..
+        PxConvexMesh *triangleMesh = PxToolkit::createConvexMesh(
+            *physxSingleton().mPhysics, *physxSingleton().mCooking, (PxVec3 *)Vfloat.p, Vfloat.d0,
+            PxConvexFlag::eCOMPUTE_CONVEX);
+        geometry = new PxConvexMeshGeometry(triangleMesh);
+      }
+      break;
+      case rai::ST_marker:
+      {
+        geometry = nullptr;
+      }
+      break;
+      default:
+        NIY;
+      }
+
+      if (geometry)
+      {
+        //-- decide/create a specific material
+        PxMaterial *mMaterial = defaultMaterial;
+        double fric = -1.;
+        if (s->frame.ats.get<double>(fric, "friction"))
+        {
+          cout << "setting friction " << fric << " for frame" << f->name << endl;
+          mMaterial = physxSingleton().mPhysics->createMaterial(fric, fric, .1f);
+        }
+        PxShape *shape = physxSingleton().mPhysics->createShape(*geometry, *mMaterial, true);
+        link->attachShape(*shape);
+        if (&s->frame != f)
+        {
+          if (s->frame.parent == f)
+          {
+            shape->setLocalPose(conv_Transformation2PxTrans(s->frame.get_Q()));
+          }
+          else
+          {
+            rai::Transformation rel = p->ensure_X() / f->ensure_X();
+            shape->setLocalPose(conv_Transformation2PxTrans(rel));
+          }
+        }
+        CHECK(shape, "create shape failed!");
+      }
+    }
+
+    if (f->inertia && f->inertia->mass > 0.)
+    {
+      PxRigidBodyExt::setMassAndUpdateInertia(*link, f->inertia->mass);
+    }
+    else
+    {
+      PxRigidBodyExt::updateMassAndInertia(*link, 1.f);
+    }
+
+    if (parent){
+      PxArticulationJointReducedCoordinate *joint = static_cast<PxArticulationJointReducedCoordinate*>(link->getInboundJoint());
+      rai::Transformation rel;
+      rai::Frame *from = f->parent->getUpwardLink(rel);
+
+      PxTransform A = conv_Transformation2PxTrans(rel);
+      PxTransform B = Id_PxTrans();
+
+      joint->setParentPose(A);
+      joint->setChildPose(B.getInverse());
+      switch(f->joint->type) {
+        case rai::JT_free: //do nothing
+          break;
+        case rai::JT_hingeX:
+        case rai::JT_hingeY:
+        case rai::JT_hingeZ:
+        {
+          joint->setJointType(PxArticulationJointType::eREVOLUTE);
+          if (f->ats.find<arr>("limit"))
+          {
+
+            // if(jj->frame->ats.find<arr>("limit")) {
+            joint->setMotion(PxArticulationAxis::eTWIST, PxArticulationMotion::eLIMITED);
+            arr limits = f->ats.get<arr>("limit");
+            joint->setLimit(PxArticulationAxis::eTWIST, limits(0), limits(1));
+          }
+          else
+          {
+            joint->setMotion(PxArticulationAxis::eTWIST, PxArticulationMotion::eFREE);
+          }
+          if (f->ats.find<arr>("drive"))
+          {
+            arr drive_values = f->ats.get<arr>("drive");
+            joint->setDrive(PxArticulationAxis::eTWIST, drive_values(0), drive_values(1), PX_MAX_F32);
+          }
+        }
+        break;
+        case rai::JT_rigid:
+        {
+          joint->setJointType(PxArticulationJointType::eFIX);
+          break;
+        }
+        break;
+        case rai::JT_trans3:
+        {
+          break;
+        }
+        case rai::JT_transXYPhi:
+        {
+          break;
+        }
+        case rai::JT_transX:
+        case rai::JT_transY:
+        case rai::JT_transZ:
+        {
+          joint->setJointType(PxArticulationJointType::ePRISMATIC);
+          if (f->ats.find<arr>("limit"))
+          {
+            joint->setMotion(PxArticulationAxis::eX, PxArticulationMotion::eLIMITED);
+            arr limits = f->ats.get<arr>("limit");
+            joint->setLimit(PxArticulationAxis::eX, limits(0), limits(1));
+          }
+          else
+          {
+            joint->setMotion(PxArticulationAxis::eX, PxArticulationMotion::eFREE);
+          }
+          if (f->ats.find<arr>("drive"))
+          {
+            arr drive_values = f->ats.get<arr>("drive");
+            joint->setDrive(PxArticulationAxis::eX, drive_values(0), drive_values(1), PX_MAX_F32);
+          }
+        }
+        break;
+        default:
+          NIY;
+        }
+        joints(f->ID) = joint;
+    }
+    parent = link;
+  }
+  articulation->setArticulationFlag(PxArticulationFlag::eFIX_BASE, true);
+  gScene->addArticulation(*articulation);
+}
+
 void PhysXInterface_self::lockJoint(PxD6Joint* joint, rai::Joint* rai_joint) {
   joint->setMotion(PxD6Axis::eX, PxD6Motion::eLOCKED);
   joint->setMotion(PxD6Axis::eTWIST, PxD6Motion::eLIMITED);
