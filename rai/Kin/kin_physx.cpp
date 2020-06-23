@@ -19,9 +19,9 @@
 #include <physx/foundation/PxMat33.h>
 #include <physx/PxArticulationBase.h>
 #include <physx/PxArticulationJoint.h>
+#include <physx/PxRigidDynamic.h>
 #include <physx/PxArticulationReducedCoordinate.h>
-//#include <physx/pvd/PxVisualDebugger.h>
-//#include <physx/physxvisualdebuggersdk/PvdConnectionFlags.h>
+#include <physx/pvd/PxPvd.h>
 //#include <PxMat33Legacy.h>
 #include <physx/extensions/PxSimpleFactory.h>
 #pragma GCC diagnostic pop
@@ -43,8 +43,7 @@ struct PhysXSingleton{
   void create(){
     mFoundation = PxCreateFoundation(PX_PHYSICS_VERSION, gDefaultAllocatorCallback, gDefaultErrorCallback);
     mPhysics = PxCreatePhysics(PX_PHYSICS_VERSION, *mFoundation, PxTolerancesScale());
-    PxCookingParams cookParams(mPhysics->getTolerancesScale());
-    mCooking = PxCreateCooking(PX_PHYSICS_VERSION, *mFoundation, cookParams);
+    mCooking = PxCreateCooking(PX_PHYSICS_VERSION, *mFoundation, PxCookingParams(PxTolerancesScale()));
     if(!mCooking) HALT("PxCreateCooking failed!");
     if(!mPhysics) HALT("Error creating PhysX3 device.");
     //if(!PxInitExtensions(*mPhysics)) HALT("PxInitExtensions failed!");
@@ -160,11 +159,17 @@ PhysXInterface::PhysXInterface(const rai::Configuration& C, int verbose): self(n
 
   if(!physxSingleton().mFoundation) physxSingleton().create();
 
-  //PxExtensionVisualDebugger::connect(mPhysics->getPvdConnectionManager(),"localhost",5425, 10000, true);
-
+  if (verbose > 100){
+    PxPvd* gPvd = PxCreatePvd(*physxSingleton().mFoundation);
+    PxPvdTransport* transport = PxDefaultPvdSocketTransportCreate("192.168.0.94", 5425, 10);
+	  gPvd->connect(*transport,PxPvdInstrumentationFlag::eALL);
+    PxInitExtensions(*physxSingleton().mPhysics, gPvd);
+  }
   //-- Create the scene
   PxSceneDesc sceneDesc(physxSingleton().mPhysics->getTolerancesScale());
   sceneDesc.gravity = PxVec3(0.f, 0.f, -9.8f);
+
+  // sceneDesc.solverType = PxSolverType::eTGS;
 
 
   if(!sceneDesc.cpuDispatcher) {
@@ -194,9 +199,8 @@ PhysXInterface::PhysXInterface(const rai::Configuration& C, int verbose): self(n
 
   PxRigidStatic* plane = physxSingleton().mPhysics->createRigidStatic(pose);
   CHECK(plane, "create plane failed!");
+  PxShape *planeShape = PxRigidActorExt::createExclusiveShape(*plane, PxPlaneGeometry(), *self->defaultMaterial);
 
-  PxShape *planeShape = physxSingleton().mPhysics->createShape(PxPlaneGeometry(), *self->defaultMaterial, true);
-  plane->attachShape(*planeShape);
   CHECK(planeShape, "create shape failed!");
   self->gScene->addActor(*plane);
 
@@ -216,7 +220,6 @@ PhysXInterface::PhysXInterface(const rai::Configuration& C, int verbose): self(n
     }
   };
   self->addArticulatedLinks(links, verbose);
-  // for(rai::Frame* a : links) if (a->joint) self->addJoint(a->joint); //DONT ADD JOINTS!!!!
 
   if(verbose>0) LOG(0) <<"... done creating Configuration within PhysX";
 
@@ -284,34 +287,27 @@ void PhysXInterface::pushKinematicStates(const FrameL &frames, const arr &q_dot)
 {
   for (rai::Frame *f : frames)
   {
-    cout << "FRAME: " << f->name << endl;
-    if (self->joints.N <= f->ID)
-      continue;
     if (f->ats.find<arr>("drive"))
     {
-    cout << "Getting joint" << endl;
-      PxArticulationJointReducedCoordinate *joint = self->joints(f->ID);
-    cout << "Calc" << endl;
+      PxArticulationJointReducedCoordinate *joint = self->joints(f->joint->qIndex);
       arr q = f->joint->calc_q_from_Q(f->joint->Q());
-      cout << "JOINT: " << joint << endl;
+      cout << f->name << endl;
       switch (f->joint->type)
       {
       case rai::JT_hingeX:
       case rai::JT_hingeY:
       case rai::JT_hingeZ:
       {
-        cout << "set target" << endl;
-        joint->setDriveTarget(PxArticulationAxis::eTWIST, PxReal(1.0f));
+        joint->setDriveTarget(PxArticulationAxis::eTWIST, q.scalar());
         if (!!q_dot)
         {
-        cout << "set vel" << endl;
           joint->setDriveVelocity(PxArticulationAxis::eTWIST, q_dot(f->joint->qIndex));
         }
         break;
       }
       case rai::JT_transX:
       {
-        joint->setDriveTarget(PxArticulationAxis::eX, PxReal(1.0f));
+        joint->setDriveTarget(PxArticulationAxis::eX, q.scalar());
         if (!!q_dot)
         {
           joint->setDriveVelocity(PxArticulationAxis::eX, q_dot(f->joint->qIndex));
@@ -496,8 +492,6 @@ void PhysXInterface_self::addArticulatedLinks(FrameL links, int verbose){
     if (!f->ats.find<double>("articulated")){
       continue;
     }
-    while (joints.N <= f->ID)
-      joints.append(nullptr);
 
     if (verbose > 0)
       LOG(0) << "ADDING ARTICULATED LINK FOR FRAME " << f->name;
@@ -505,10 +499,14 @@ void PhysXInterface_self::addArticulatedLinks(FrameL links, int verbose){
     FrameL parts = {f};
     f->getRigidSubFrames(parts);
 
+    if (verbose > 0) for(rai::Frame* part:parts) LOG(0) << "PART: " << part->name;
+
     PxArticulationLink *link = articulation->createLink(parent, conv_Transformation2PxTrans(f->ensure_X()));
+
 
     for (rai::Frame *p : parts)
     {
+      
       rai::Shape *s = p->shape;
       if (!s)
         continue;
@@ -547,9 +545,15 @@ void PhysXInterface_self::addArticulatedLinks(FrameL links, int verbose){
 
         Vfloat.clear();
         copy(Vfloat, s->mesh().V); //convert vertices from double to float array..
-        PxConvexMesh *triangleMesh = PxToolkit::createConvexMesh(
-            *physxSingleton().mPhysics, *physxSingleton().mCooking, (PxVec3 *)Vfloat.p, Vfloat.d0,
-            PxConvexFlag::eCOMPUTE_CONVEX);
+        PxCookingParams params = physxSingleton().mCooking->getParams();
+        params.convexMeshCookingType = PxConvexMeshCookingType::eQUICKHULL;
+
+        PxConvexMeshDesc conv_desc;
+        conv_desc.points.data = (PxVec3 * )Vfloat.p;
+        conv_desc.points.count = Vfloat.d0;
+        conv_desc.points.stride = sizeof(PxVec3);
+        conv_desc.flags = PxConvexFlag::eCOMPUTE_CONVEX;
+        PxConvexMesh *triangleMesh = physxSingleton().mCooking->createConvexMesh(conv_desc, physxSingleton().mPhysics->getPhysicsInsertionCallback());
         geometry = new PxConvexMeshGeometry(triangleMesh);
       }
       break;
@@ -572,8 +576,8 @@ void PhysXInterface_self::addArticulatedLinks(FrameL links, int verbose){
           cout << "setting friction " << fric << " for frame" << f->name << endl;
           mMaterial = physxSingleton().mPhysics->createMaterial(fric, fric, .1f);
         }
-        PxShape *shape = physxSingleton().mPhysics->createShape(*geometry, *mMaterial, true);
-        link->attachShape(*shape);
+        PxShape *shape = PxRigidActorExt::createExclusiveShape(*link, *geometry, *mMaterial);
+        shape->setRestOffset(0.001f);
         if (&s->frame != f)
         {
           if (s->frame.parent == f)
@@ -586,13 +590,13 @@ void PhysXInterface_self::addArticulatedLinks(FrameL links, int verbose){
             shape->setLocalPose(conv_Transformation2PxTrans(rel));
           }
         }
-        CHECK(shape, "create shape failed!");
       }
     }
 
     if (f->inertia && f->inertia->mass > 0.)
     {
       PxRigidBodyExt::setMassAndUpdateInertia(*link, f->inertia->mass);
+      if(verbose>0) LOG(0) << "mass: " << f->inertia->mass;
     }
     else
     {
@@ -602,7 +606,7 @@ void PhysXInterface_self::addArticulatedLinks(FrameL links, int verbose){
     if (parent){
       PxArticulationJointReducedCoordinate *joint = static_cast<PxArticulationJointReducedCoordinate*>(link->getInboundJoint());
       rai::Transformation rel;
-      rai::Frame *from = f->parent->getUpwardLink(rel);
+      f->parent->getUpwardLink(rel);
 
       PxTransform A = conv_Transformation2PxTrans(rel);
       PxTransform B = Id_PxTrans();
@@ -619,8 +623,6 @@ void PhysXInterface_self::addArticulatedLinks(FrameL links, int verbose){
           joint->setJointType(PxArticulationJointType::eREVOLUTE);
           if (f->ats.find<arr>("limit"))
           {
-
-            // if(jj->frame->ats.find<arr>("limit")) {
             joint->setMotion(PxArticulationAxis::eTWIST, PxArticulationMotion::eLIMITED);
             arr limits = f->ats.get<arr>("limit");
             joint->setLimit(PxArticulationAxis::eTWIST, limits(0), limits(1));
@@ -675,12 +677,15 @@ void PhysXInterface_self::addArticulatedLinks(FrameL links, int verbose){
         default:
           NIY;
         }
-        joints(f->ID) = joint;
+        joints.append(joint);
     }
     parent = link;
   }
   articulation->setArticulationFlag(PxArticulationFlag::eFIX_BASE, true);
+  articulation->setSolverIterationCounts(25);
+  
   gScene->addArticulation(*articulation);
+  cout << joints << endl;
 }
 
 void PhysXInterface_self::lockJoint(PxD6Joint* joint, rai::Joint* rai_joint) {
@@ -788,9 +793,15 @@ void PhysXInterface_self::addLink(rai::Frame* f, int verbose) {
 
         Vfloat.clear();
         copy(Vfloat, s->mesh().V); //convert vertices from double to float array..
-        PxConvexMesh* triangleMesh = PxToolkit::createConvexMesh(
-                                       *physxSingleton().mPhysics, *physxSingleton().mCooking, (PxVec3*)Vfloat.p, Vfloat.d0,
-                                       PxConvexFlag::eCOMPUTE_CONVEX);
+        PxCookingParams params = physxSingleton().mCooking->getParams();
+        params.convexMeshCookingType = PxConvexMeshCookingType::eQUICKHULL;
+
+        PxConvexMeshDesc conv_desc;
+        conv_desc.points.data = (PxVec3 * )Vfloat.p;
+        conv_desc.points.count = Vfloat.d0;
+        conv_desc.points.stride = sizeof(PxVec3);
+        conv_desc.flags = PxConvexFlag::eCOMPUTE_CONVEX;
+        PxConvexMesh *triangleMesh = physxSingleton().mCooking->createConvexMesh(conv_desc, physxSingleton().mPhysics->getPhysicsInsertionCallback());
         geometry = new PxConvexMeshGeometry(triangleMesh);
       } break;
       case rai::ST_marker: {
@@ -808,8 +819,8 @@ void PhysXInterface_self::addLink(rai::Frame* f, int verbose) {
         cout << "setting friction " << fric << " for frame" << f->name << endl; 
         mMaterial = physxSingleton().mPhysics->createMaterial(fric, fric, .1f);
       }
-      PxShape* shape = physxSingleton().mPhysics->createShape(*geometry, *mMaterial, true);
-      actor->attachShape(*shape);
+      PxShape *shape = PxRigidActorExt::createExclusiveShape(*actor, *geometry, *mMaterial);
+      shape->setRestOffset(0.001f);
       if(&s->frame!=f) {
         if(s->frame.parent==f) {
           shape->setLocalPose(conv_Transformation2PxTrans(s->frame.get_Q()));
