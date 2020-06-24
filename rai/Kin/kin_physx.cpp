@@ -941,7 +941,9 @@ void PhysXInterface::ShutdownPhysX() {
   //  self->mMaterial
   //  self->plane
   //  self->planeShape
-
+  for (PxArticulationReducedCoordinate* articulation: self->articulations){
+    self->gScene->removeArticulation(*articulation);
+  }
   for(PxRigidActor* a: self->actors) if(a) {
       self->gScene->removeActor(*a);
       a->release();
