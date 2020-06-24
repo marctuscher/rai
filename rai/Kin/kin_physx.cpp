@@ -135,6 +135,8 @@ struct PhysXInterface_self {
   rai::Array<PxArticulationJointReducedCoordinate*> joints;
   OpenGL* gl=nullptr;
   rai::Configuration* C=nullptr;
+  rai::Array<rai::Array<PxArticulationLink*>> articulation_links;
+  rai::Array<PxArticulationReducedCoordinate*> articulations;
 
   uint stepCount=0;
 
@@ -169,7 +171,7 @@ PhysXInterface::PhysXInterface(const rai::Configuration& C, int verbose): self(n
   PxSceneDesc sceneDesc(physxSingleton().mPhysics->getTolerancesScale());
   sceneDesc.gravity = PxVec3(0.f, 0.f, -9.8f);
 
-  // sceneDesc.solverType = PxSolverType::eTGS;
+  sceneDesc.solverType = PxSolverType::eTGS;
 
 
   if(!sceneDesc.cpuDispatcher) {
@@ -289,9 +291,10 @@ void PhysXInterface::pushKinematicStates(const FrameL &frames, const arr &q_dot)
   {
     if (f->ats.find<arr>("drive"))
     {
-      PxArticulationJointReducedCoordinate *joint = self->joints(f->joint->qIndex);
+      PxArticulationJointReducedCoordinate *joint = self->joints(f->ID);
+      int qIndex = f->joint->qIndex;
       arr q = f->joint->calc_q_from_Q(f->joint->Q());
-      cout << f->name << endl;
+      cout << f->name << " : " << joint << endl;
       switch (f->joint->type)
       {
       case rai::JT_hingeX:
@@ -301,7 +304,7 @@ void PhysXInterface::pushKinematicStates(const FrameL &frames, const arr &q_dot)
         joint->setDriveTarget(PxArticulationAxis::eTWIST, q.scalar());
         if (!!q_dot)
         {
-          joint->setDriveVelocity(PxArticulationAxis::eTWIST, q_dot(f->joint->qIndex));
+          joint->setDriveVelocity(PxArticulationAxis::eTWIST, q_dot(qIndex));
         }
         break;
       }
@@ -310,7 +313,7 @@ void PhysXInterface::pushKinematicStates(const FrameL &frames, const arr &q_dot)
         joint->setDriveTarget(PxArticulationAxis::eX, q.scalar());
         if (!!q_dot)
         {
-          joint->setDriveVelocity(PxArticulationAxis::eX, q_dot(f->joint->qIndex));
+          joint->setDriveVelocity(PxArticulationAxis::eX, q_dot(qIndex));
         }
         break;
       }
@@ -483,15 +486,27 @@ void PhysXInterface_self::addJoint(rai::Joint* jj) {
 #endif
 
 void PhysXInterface_self::addArticulatedLinks(FrameL links, int verbose){
-  PxArticulationReducedCoordinate* articulation = physxSingleton().mPhysics->createArticulationReducedCoordinate();
-
-  // assuming that links are ordered
-  PxArticulationLink *parent = NULL;
 
   for (rai::Frame* f: links){
-    if (!f->ats.find<double>("articulated")){
+    double articulated = -1.;
+    if (!f->ats.get<double>(articulated, "articulated")){
       continue;
     }
+    if (articulated < 0.) continue; // defensive check. 
+    PxArticulationReducedCoordinate *articulation;
+    PxArticulationLink *parent = NULL;
+    rai::Transformation parentTransform;
+    rai::Frame* parentFrame;
+    if (!articulations.N || articulations.N <= articulated){
+      articulation = physxSingleton().mPhysics->createArticulationReducedCoordinate();
+      articulations.append(articulation);
+    }else{
+      articulation = articulations(articulated);
+      parentFrame = f->parent->getUpwardLink(parentTransform);
+      cout << "PARENT: " << parentFrame -> name << endl;
+      parent = (PxArticulationLink*)actors(parentFrame->ID);
+    }
+    
 
     if (verbose > 0)
       LOG(0) << "ADDING ARTICULATED LINK FOR FRAME " << f->name;
@@ -503,10 +518,11 @@ void PhysXInterface_self::addArticulatedLinks(FrameL links, int verbose){
 
     PxArticulationLink *link = articulation->createLink(parent, conv_Transformation2PxTrans(f->ensure_X()));
 
-
+    link->userData = f;
+    actors(f->ID) = link;
+    
     for (rai::Frame *p : parts)
     {
-      
       rai::Shape *s = p->shape;
       if (!s)
         continue;
@@ -525,22 +541,12 @@ void PhysXInterface_self::addArticulatedLinks(FrameL links, int verbose){
         geometry = new PxSphereGeometry(s->size(-1));
       }
       break;
-        //      case rai::ST_capsule: {
-        //        geometry = new PxCapsuleGeometry(s->size(-1), .5*s->size(-2));
-        //      }
-        //      break;
       case rai::ST_capsule:
       case rai::ST_cylinder:
       case rai::ST_ssBox:
       case rai::ST_ssCvx:
       case rai::ST_mesh:
       {
-        // Note: physx can't decompose meshes itself.
-        // Physx doesn't support triangle meshes in dynamic objects! See:
-        // file:///home/mtoussai/lib/PhysX/Documentation/PhysXGuide/Manual/Shapes.html
-        // We have to decompose the meshes "by hand" and feed them to PhysX.
-
-        // PhysX uses float for the vertices
         floatA Vfloat;
 
         Vfloat.clear();
@@ -577,7 +583,7 @@ void PhysXInterface_self::addArticulatedLinks(FrameL links, int verbose){
           mMaterial = physxSingleton().mPhysics->createMaterial(fric, fric, .1f);
         }
         PxShape *shape = PxRigidActorExt::createExclusiveShape(*link, *geometry, *mMaterial);
-        shape->setRestOffset(0.001f);
+        // shape->setRestOffset(0.001f);
         if (&s->frame != f)
         {
           if (s->frame.parent == f)
@@ -592,7 +598,6 @@ void PhysXInterface_self::addArticulatedLinks(FrameL links, int verbose){
         }
       }
     }
-
     if (f->inertia && f->inertia->mass > 0.)
     {
       PxRigidBodyExt::setMassAndUpdateInertia(*link, f->inertia->mass);
@@ -602,19 +607,38 @@ void PhysXInterface_self::addArticulatedLinks(FrameL links, int verbose){
     {
       PxRigidBodyExt::updateMassAndInertia(*link, 1.f);
     }
+    }
 
-    if (parent){
-      PxArticulationJointReducedCoordinate *joint = static_cast<PxArticulationJointReducedCoordinate*>(link->getInboundJoint());
-      rai::Transformation rel;
-      f->parent->getUpwardLink(rel);
+    // add articuations to the scene after finished assembly
+    for (PxArticulationReducedCoordinate *finished_articulation : articulations)
+    {
+      for (PxU32 i = 0; i < finished_articulation->getNbLinks(); ++i)
+      {
+        PxArticulationLink *parentLink;
+        finished_articulation->getLinks(&parentLink, 1, i);
+        PxU32 nbChildren = parentLink->getNbChildren();
+      for (PxU32 j = 0; j < parentLink->getNbChildren(); ++j)
+      {
+        PxArticulationLink *child;
+        parentLink->getChildren(&child, 1, j);
+        PxArticulationJointReducedCoordinate *joint = static_cast<PxArticulationJointReducedCoordinate *>(child->getInboundJoint());
+        rai::Frame *parentFrame = (rai::Frame *)parentLink->userData;
+        rai::Frame *f = (rai::Frame *)child->userData;
+        while (joints.N <= f->ID)
+          joints.append(nullptr);
 
-      PxTransform A = conv_Transformation2PxTrans(rel);
-      PxTransform B = Id_PxTrans();
+        joints(f->ID) = joint;
 
-      joint->setParentPose(A);
-      joint->setChildPose(B.getInverse());
-      switch(f->joint->type) {
-        case rai::JT_free: //do nothing
+        rai::Transformation parentTransform;
+        parentFrame = f->parent->getUpwardLink(parentTransform);
+        PxTransform A = conv_Transformation2PxTrans(parentTransform);
+        PxTransform B = Id_PxTrans();
+
+        joint->setParentPose(A);
+        joint->setChildPose(B.getInverse());
+        switch (f->joint->type)
+        {
+        case rai::JT_free:
           break;
         case rai::JT_hingeX:
         case rai::JT_hingeY:
@@ -677,15 +701,11 @@ void PhysXInterface_self::addArticulatedLinks(FrameL links, int verbose){
         default:
           NIY;
         }
-        joints.append(joint);
+      }
+      }
+    finished_articulation->setArticulationFlag(PxArticulationFlag::eFIX_BASE, true);
+    gScene->addArticulation(*finished_articulation);
     }
-    parent = link;
-  }
-  articulation->setArticulationFlag(PxArticulationFlag::eFIX_BASE, true);
-  articulation->setSolverIterationCounts(25);
-  
-  gScene->addArticulation(*articulation);
-  cout << joints << endl;
 }
 
 void PhysXInterface_self::lockJoint(PxD6Joint* joint, rai::Joint* rai_joint) {

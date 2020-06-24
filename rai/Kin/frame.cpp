@@ -183,13 +183,28 @@ FrameL rai::Frame::getPathToRoot() {
 rai::Frame* rai::Frame::getUpwardLink(rai::Transformation& Qtotal, bool untilPartBreak) const {
   if(!!Qtotal) Qtotal.setZero();
   const Frame* f=this;
-  while(f->parent) {
-    if(!untilPartBreak) {
-      if(f->joint) break;
-    } else {
-      if(f->joint->isPartBreak()) break;
+  while (f->parent)
+  {
+    double articulated = -1;
+    f->ats.get<double>(articulated, "articulated");
+    cout << f->name << endl;
+    cout << articulated << endl;
+    if (!untilPartBreak)
+    {
+      if (f->joint)
+        break;
+      else if (articulated >= 0)
+      {
+        break;
+      }
     }
-    if(!!Qtotal) Qtotal = f->Q*Qtotal;
+    else
+    {
+      if (f->joint->isPartBreak())
+        break;
+    }
+    if (!!Qtotal)
+      Qtotal = f->Q * Qtotal;
     f = f->parent;
   }
   return (Frame*)f;

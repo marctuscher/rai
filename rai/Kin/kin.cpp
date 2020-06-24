@@ -2218,7 +2218,7 @@ struct Link {
 
 rai::Array<rai::Frame*> rai::Configuration::getLinks() const {
   FrameL links;
-  for(Frame* a:frames) if(!a->parent || a->joint) links.append(a);
+  for(Frame* a:frames) if(!a->parent || a->joint || a->ats.find<double>("articulated")) links.append(a);
   return links;
 }
 
