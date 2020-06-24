@@ -626,95 +626,120 @@ void PhysXInterface_self::addArticulatedLinks(FrameL links, int verbose){
       {
         PxArticulationLink *parentLink;
         finished_articulation->getLinks(&parentLink, 1, i);
-        PxU32 nbChildren = parentLink->getNbChildren();
-      for (PxU32 j = 0; j < parentLink->getNbChildren(); ++j)
-      {
-        PxArticulationLink *child;
-        parentLink->getChildren(&child, 1, j);
-        PxArticulationJointReducedCoordinate *joint = static_cast<PxArticulationJointReducedCoordinate *>(child->getInboundJoint());
-        rai::Frame *parentFrame = (rai::Frame *)parentLink->userData;
-        rai::Frame *f = (rai::Frame *)child->userData;
-        while (joints.N <= f->ID)
-          joints.append(nullptr);
+        for (PxU32 j = 0; j < parentLink->getNbChildren(); ++j)
+        {
+          PxArticulationLink *child;
+          parentLink->getChildren(&child, 1, j);
+          PxArticulationJointReducedCoordinate *joint = static_cast<PxArticulationJointReducedCoordinate *>(child->getInboundJoint());
+          rai::Frame *parentFrame = (rai::Frame *)parentLink->userData;
+          rai::Frame *f = (rai::Frame *)child->userData;
+          while (joints.N <= f->ID)
+            joints.append(nullptr);
 
-        joints(f->ID) = joint;
+          joints(f->ID) = joint;
 
-        rai::Transformation parentTransform;
-        parentFrame = f->parent->getUpwardLink(parentTransform);
-        PxTransform A = conv_Transformation2PxTrans(parentTransform);
-        PxTransform B = Id_PxTrans();
+          rai::Transformation parentTransform;
+          parentFrame = f->parent->getUpwardLink(parentTransform);
+          PxTransform A = conv_Transformation2PxTrans(parentTransform);
+          PxTransform B = Id_PxTrans();
 
-        joint->setParentPose(A);
-        joint->setChildPose(B.getInverse());
-        switch (f->joint->type)
-        {
-        case rai::JT_free:
+          joint->setParentPose(A);
+          joint->setChildPose(B.getInverse());
+          switch (f->joint->type)
+          {
+          case rai::JT_hingeX:
+          case rai::JT_hingeY:
+          case rai::JT_hingeZ:
+          {
+            joint->setJointType(PxArticulationJointType::eREVOLUTE);
+            if (f->ats.find<arr>("limit"))
+            {
+              joint->setMotion(PxArticulationAxis::eTWIST, PxArticulationMotion::eLIMITED);
+              arr limits = f->ats.get<arr>("limit");
+              joint->setLimit(PxArticulationAxis::eTWIST, limits(0), limits(1));
+            }
+            else
+            {
+              joint->setMotion(PxArticulationAxis::eTWIST, PxArticulationMotion::eFREE);
+            }
+            if (f->ats.find<arr>("drive"))
+            {
+              arr drive_values = f->ats.get<arr>("drive");
+              joint->setDrive(PxArticulationAxis::eTWIST, drive_values(0), drive_values(1), PX_MAX_F32);
+            }
+          }
           break;
-        case rai::JT_hingeX:
-        case rai::JT_hingeY:
-        case rai::JT_hingeZ:
-        {
-          joint->setJointType(PxArticulationJointType::eREVOLUTE);
-          if (f->ats.find<arr>("limit"))
+          case rai::JT_rigid:
           {
-            joint->setMotion(PxArticulationAxis::eTWIST, PxArticulationMotion::eLIMITED);
-            arr limits = f->ats.get<arr>("limit");
-            joint->setLimit(PxArticulationAxis::eTWIST, limits(0), limits(1));
+            joint->setJointType(PxArticulationJointType::eFIX);
+            break;
           }
-          else
-          {
-            joint->setMotion(PxArticulationAxis::eTWIST, PxArticulationMotion::eFREE);
-          }
-          if (f->ats.find<arr>("drive"))
-          {
-            arr drive_values = f->ats.get<arr>("drive");
-            joint->setDrive(PxArticulationAxis::eTWIST, drive_values(0), drive_values(1), PX_MAX_F32);
-          }
-        }
-        break;
-        case rai::JT_rigid:
-        {
-          joint->setJointType(PxArticulationJointType::eFIX);
           break;
-        }
-        break;
-        case rai::JT_trans3:
-        {
+          case rai::JT_transX:
+          {
+            joint->setJointType(PxArticulationJointType::ePRISMATIC);
+            if (f->ats.find<arr>("limit"))
+            {
+              joint->setMotion(PxArticulationAxis::eX, PxArticulationMotion::eLIMITED);
+              arr limits = f->ats.get<arr>("limit");
+              joint->setLimit(PxArticulationAxis::eX, limits(0), limits(1));
+            }
+            else
+            {
+              joint->setMotion(PxArticulationAxis::eX, PxArticulationMotion::eFREE);
+            }
+            if (f->ats.find<arr>("drive"))
+            {
+              arr drive_values = f->ats.get<arr>("drive");
+              joint->setDrive(PxArticulationAxis::eX, drive_values(0), drive_values(1), PX_MAX_F32);
+            }
+          }
+          case rai::JT_transY:
+          {
+            joint->setJointType(PxArticulationJointType::ePRISMATIC);
+            if (f->ats.find<arr>("limit"))
+            {
+              joint->setMotion(PxArticulationAxis::eY, PxArticulationMotion::eLIMITED);
+              arr limits = f->ats.get<arr>("limit");
+              joint->setLimit(PxArticulationAxis::eY, limits(0), limits(1));
+            }
+            else
+            {
+              joint->setMotion(PxArticulationAxis::eY, PxArticulationMotion::eFREE);
+            }
+            if (f->ats.find<arr>("drive"))
+            {
+              arr drive_values = f->ats.get<arr>("drive");
+              joint->setDrive(PxArticulationAxis::eY, drive_values(0), drive_values(1), PX_MAX_F32);
+            }
+          }
+          case rai::JT_transZ:
+          {
+            joint->setJointType(PxArticulationJointType::ePRISMATIC);
+            if (f->ats.find<arr>("limit"))
+            {
+              joint->setMotion(PxArticulationAxis::eZ, PxArticulationMotion::eLIMITED);
+              arr limits = f->ats.get<arr>("limit");
+              joint->setLimit(PxArticulationAxis::eZ, limits(0), limits(1));
+            }
+            else
+            {
+              joint->setMotion(PxArticulationAxis::eZ, PxArticulationMotion::eFREE);
+            }
+            if (f->ats.find<arr>("drive"))
+            {
+              arr drive_values = f->ats.get<arr>("drive");
+              joint->setDrive(PxArticulationAxis::eZ, drive_values(0), drive_values(1), PX_MAX_F32);
+            }
+          }
           break;
-        }
-        case rai::JT_transXYPhi:
-        {
-          break;
-        }
-        case rai::JT_transX:
-        case rai::JT_transY:
-        case rai::JT_transZ:
-        {
-          joint->setJointType(PxArticulationJointType::ePRISMATIC);
-          if (f->ats.find<arr>("limit"))
-          {
-            joint->setMotion(PxArticulationAxis::eX, PxArticulationMotion::eLIMITED);
-            arr limits = f->ats.get<arr>("limit");
-            joint->setLimit(PxArticulationAxis::eX, limits(0), limits(1));
+          default:
+            NIY;
           }
-          else
-          {
-            joint->setMotion(PxArticulationAxis::eX, PxArticulationMotion::eFREE);
-          }
-          if (f->ats.find<arr>("drive"))
-          {
-            arr drive_values = f->ats.get<arr>("drive");
-            joint->setDrive(PxArticulationAxis::eX, drive_values(0), drive_values(1), PX_MAX_F32);
-          }
-        }
-        break;
-        default:
-          NIY;
         }
       }
-      }
-    finished_articulation->setArticulationFlag(PxArticulationFlag::eFIX_BASE, true);
-    gScene->addArticulation(*finished_articulation);
+      finished_articulation->setArticulationFlag(PxArticulationFlag::eFIX_BASE, true);
+      gScene->addArticulation(*finished_articulation);
     }
 }
 
