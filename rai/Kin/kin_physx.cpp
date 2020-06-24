@@ -745,7 +745,6 @@ void PhysXInterface_self::addArticulatedLinks(FrameL links, int verbose){
           default:
             NIY;
           }
-          arr q = f->joint->calc_q_from_Q(f->joint->Q());
         }
       }
       // zero all velocties

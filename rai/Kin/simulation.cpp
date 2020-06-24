@@ -154,7 +154,7 @@ void Simulation::step(const arr& u_control, double tau, ControlMode u_mode) {
   if(engine==_physx) {
     if (u_mode == _velocity){
       self->physx->pushKinematicStates(C.frames, u_control);
-    }else if(u_mode==_position){
+    }else{
       self->physx->pushKinematicStates(C.frames);
     }
     self->physx->step(tau);
