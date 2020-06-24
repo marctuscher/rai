@@ -319,10 +319,20 @@ void PhysXInterface::pushKinematicStates(const FrameL &frames, const arr &q_dot)
       }
       case rai::JT_transY:
       {
+        joint->setDriveTarget(PxArticulationAxis::eY, q.scalar());
+        if (!!q_dot)
+        {
+          joint->setDriveVelocity(PxArticulationAxis::eY, q_dot(qIndex));
+        }
         break;
       }
       case rai::JT_transZ:
       {
+        joint->setDriveTarget(PxArticulationAxis::eZ, q.scalar());
+        if (!!q_dot)
+        {
+          joint->setDriveVelocity(PxArticulationAxis::eZ, q_dot(qIndex));
+        }
         break;
       }
       default:
