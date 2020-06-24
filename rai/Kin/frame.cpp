@@ -187,8 +187,6 @@ rai::Frame* rai::Frame::getUpwardLink(rai::Transformation& Qtotal, bool untilPar
   {
     double articulated = -1;
     f->ats.get<double>(articulated, "articulated");
-    cout << f->name << endl;
-    cout << articulated << endl;
     if (!untilPartBreak)
     {
       if (f->joint)
