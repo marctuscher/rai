@@ -46,7 +46,12 @@ struct PhysXSingleton{
     mCooking = PxCreateCooking(PX_PHYSICS_VERSION, *mFoundation, PxCookingParams(PxTolerancesScale()));
     if(!mCooking) HALT("PxCreateCooking failed!");
     if(!mPhysics) HALT("Error creating PhysX3 device.");
-    //if(!PxInitExtensions(*mPhysics)) HALT("PxInitExtensions failed!");
+
+    // set default params for mesh cooking
+    PxCookingParams params = mCooking->getParams();
+    params.convexMeshCookingType = PxConvexMeshCookingType::eQUICKHULL;
+    mCooking->setParams(params);
+
   }
 
   ~PhysXSingleton(){
@@ -147,6 +152,7 @@ struct PhysXInterface_self {
   void addLink(rai::Frame* b, int verbose);
   void addArticulatedLinks(FrameL links, int verbose);
   void addJoint(rai::Joint* jj);
+  void setInitialState(const FrameL links);
 
   void lockJoint(PxD6Joint* joint, rai::Joint* rai_joint);
   void unlockJoint(PxD6Joint* joint, rai::Joint* rai_joint);
@@ -221,7 +227,10 @@ PhysXInterface::PhysXInterface(const rai::Configuration& C, int verbose): self(n
       self->addLink(a, verbose);
     }
   };
+
+  // add articulated links
   self->addArticulatedLinks(links, verbose);
+  self->setInitialState(C.frames);
 
   if(verbose>0) LOG(0) <<"... done creating Configuration within PhysX";
 
@@ -257,7 +266,7 @@ void PhysXInterface::pullDynamicStates(FrameL& frames, arr& frameVelocities) {
     PxRigidActor* a = self->actors(f->ID);
     if(!a) continue;
 
-    if(self->actorTypes(f->ID) == rai::BT_dynamic) {
+    if(true /*self->actorTypes(f->ID) == rai::BT_dynamic*/) {
       rai::Transformation X;
       PxTrans2raiTrans(X, a->getGlobalPose());
       f->set_X() = X;
@@ -294,7 +303,6 @@ void PhysXInterface::pushKinematicStates(const FrameL &frames, const arr &q_dot)
       PxArticulationJointReducedCoordinate *joint = self->joints(f->ID);
       int qIndex = f->joint->qIndex;
       arr q = f->joint->calc_q_from_Q(f->joint->Q());
-      cout << f->name << " : " << joint << endl;
       switch (f->joint->type)
       {
       case rai::JT_hingeX:
@@ -497,6 +505,8 @@ void PhysXInterface_self::addJoint(rai::Joint* jj) {
 
 void PhysXInterface_self::addArticulatedLinks(FrameL links, int verbose){
 
+
+
   for (rai::Frame* f: links){
     double articulated = -1.;
     if (!f->ats.get<double>(articulated, "articulated")){
@@ -561,8 +571,6 @@ void PhysXInterface_self::addArticulatedLinks(FrameL links, int verbose){
 
         Vfloat.clear();
         copy(Vfloat, s->mesh().V); //convert vertices from double to float array..
-        PxCookingParams params = physxSingleton().mCooking->getParams();
-        params.convexMeshCookingType = PxConvexMeshCookingType::eQUICKHULL;
 
         PxConvexMeshDesc conv_desc;
         conv_desc.points.data = (PxVec3 * )Vfloat.p;
@@ -622,6 +630,7 @@ void PhysXInterface_self::addArticulatedLinks(FrameL links, int verbose){
     // add articuations to the scene after finished assembly
     for (PxArticulationReducedCoordinate *finished_articulation : articulations)
     {
+      // create a cache to set an initial joint state (q_home)
       for (PxU32 i = 0; i < finished_articulation->getNbLinks(); ++i)
       {
         PxArticulationLink *parentLink;
@@ -631,7 +640,6 @@ void PhysXInterface_self::addArticulatedLinks(FrameL links, int verbose){
           PxArticulationLink *child;
           parentLink->getChildren(&child, 1, j);
           PxArticulationJointReducedCoordinate *joint = static_cast<PxArticulationJointReducedCoordinate *>(child->getInboundJoint());
-          rai::Frame *parentFrame = (rai::Frame *)parentLink->userData;
           rai::Frame *f = (rai::Frame *)child->userData;
           while (joints.N <= f->ID)
             joints.append(nullptr);
@@ -639,7 +647,7 @@ void PhysXInterface_self::addArticulatedLinks(FrameL links, int verbose){
           joints(f->ID) = joint;
 
           rai::Transformation parentTransform;
-          parentFrame = f->parent->getUpwardLink(parentTransform);
+          f->parent->getUpwardLink(parentTransform);
           PxTransform A = conv_Transformation2PxTrans(parentTransform);
           PxTransform B = Id_PxTrans();
 
@@ -667,14 +675,13 @@ void PhysXInterface_self::addArticulatedLinks(FrameL links, int verbose){
               arr drive_values = f->ats.get<arr>("drive");
               joint->setDrive(PxArticulationAxis::eTWIST, drive_values(0), drive_values(1), PX_MAX_F32);
             }
+            break;
           }
-          break;
           case rai::JT_rigid:
           {
             joint->setJointType(PxArticulationJointType::eFIX);
             break;
           }
-          break;
           case rai::JT_transX:
           {
             joint->setJointType(PxArticulationJointType::ePRISMATIC);
@@ -693,6 +700,7 @@ void PhysXInterface_self::addArticulatedLinks(FrameL links, int verbose){
               arr drive_values = f->ats.get<arr>("drive");
               joint->setDrive(PxArticulationAxis::eX, drive_values(0), drive_values(1), PX_MAX_F32);
             }
+            break;
           }
           case rai::JT_transY:
           {
@@ -712,6 +720,7 @@ void PhysXInterface_self::addArticulatedLinks(FrameL links, int verbose){
               arr drive_values = f->ats.get<arr>("drive");
               joint->setDrive(PxArticulationAxis::eY, drive_values(0), drive_values(1), PX_MAX_F32);
             }
+            break;
           }
           case rai::JT_transZ:
           {
@@ -731,16 +740,44 @@ void PhysXInterface_self::addArticulatedLinks(FrameL links, int verbose){
               arr drive_values = f->ats.get<arr>("drive");
               joint->setDrive(PxArticulationAxis::eZ, drive_values(0), drive_values(1), PX_MAX_F32);
             }
+            break;
           }
-          break;
           default:
             NIY;
           }
+          arr q = f->joint->calc_q_from_Q(f->joint->Q());
         }
       }
+      // zero all velocties
       finished_articulation->setArticulationFlag(PxArticulationFlag::eFIX_BASE, true);
       gScene->addArticulation(*finished_articulation);
     }
+}
+
+void PhysXInterface_self::setInitialState(const FrameL frames){
+
+  for (PxArticulationReducedCoordinate *finished_articulation : articulations)
+  {
+    PxArticulationCache *cache = finished_articulation->createCache();
+    finished_articulation->copyInternalStateToCache(*cache, PxArticulationCache::eALL);
+    for (rai::Frame *f : frames)
+    {
+      if (f->ats.find<arr>("drive"))
+      {
+        PxArticulationJointReducedCoordinate *joint = joints(f->ID);
+        arr q = f->joint->calc_q_from_Q(f->joint->Q());
+        cache->jointPosition[joint->getParentArticulationLink().getLinkIndex()] = q.scalar();
+      }
+    }
+    // first link does not have a joint -> setting zero
+    cache->jointPosition[0] = 0.;
+
+    // set all joint velocities to zero
+    PxMemZero(cache->jointVelocity, sizeof(PxReal) * finished_articulation->getDofs());
+
+    // apply cache
+    finished_articulation->applyCache(*cache, PxArticulationCache::eALL);
+  }
 }
 
 void PhysXInterface_self::lockJoint(PxD6Joint* joint, rai::Joint* rai_joint) {
@@ -848,8 +885,6 @@ void PhysXInterface_self::addLink(rai::Frame* f, int verbose) {
 
         Vfloat.clear();
         copy(Vfloat, s->mesh().V); //convert vertices from double to float array..
-        PxCookingParams params = physxSingleton().mCooking->getParams();
-        params.convexMeshCookingType = PxConvexMeshCookingType::eQUICKHULL;
 
         PxConvexMeshDesc conv_desc;
         conv_desc.points.data = (PxVec3 * )Vfloat.p;
