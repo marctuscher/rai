@@ -1,5 +1,30 @@
 This branch aims to incorporate PhysX 4.1 to enhance physic simulation for RL, controlled by rai.
 
+## Howto PhysX 4.1
+
+```
+
+mkdir -p ~/opt/physx/
+mkdir -p ~/opt/physx/include/physx
+mkdir -p ~/opt/physx/lib
+
+cd ~/git/
+git clone https://github.com/NVIDIAGameWorks/PhysX.git
+cd PhysX
+git checkout 4.1
+cd physx/
+./generate_projects # -> choose linux clang
+cd compiler/linux-debug
+make
+make install
+cd ../../install/linux/PhysX/include
+cp -r * ~/opt/physx/include/physx
+cd ../bin/linux.clang/debug/
+cp * ~/opt/physx/lib
+cd ../../../../PxShared/include/foundation
+cp -r * ~/opt/physx/include/physx/foundation
+```
+
 # RAI bare code
 
 This repo contains core sources related to Robotic AI. First users are
