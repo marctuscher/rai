@@ -167,12 +167,6 @@ PhysXInterface::PhysXInterface(const rai::Configuration& C, int verbose): self(n
 
   if(!physxSingleton().mFoundation) physxSingleton().create();
 
-  if (verbose > 100){
-    PxPvd* gPvd = PxCreatePvd(*physxSingleton().mFoundation);
-    PxPvdTransport* transport = PxDefaultPvdSocketTransportCreate("192.168.0.94", 5425, 10);
-	  gPvd->connect(*transport,PxPvdInstrumentationFlag::eALL);
-    PxInitExtensions(*physxSingleton().mPhysics, gPvd);
-  }
   //-- Create the scene
   PxSceneDesc sceneDesc(physxSingleton().mPhysics->getTolerancesScale());
   sceneDesc.gravity = PxVec3(0.f, 0.f, -9.8f);
@@ -195,9 +189,6 @@ PhysXInterface::PhysXInterface(const rai::Configuration& C, int verbose): self(n
   if(!self->gScene) {
     cerr << "createScene failed!" << endl;
   }
-
-  self->gScene->setVisualizationParameter(PxVisualizationParameter::eSCALE, 1.0);
-  self->gScene->setVisualizationParameter(PxVisualizationParameter::eCOLLISION_SHAPES, 1.0f);
 
   //-- Create objects
   self->defaultMaterial = physxSingleton().mPhysics->createMaterial(10.f, 10.f, 0.1f);
