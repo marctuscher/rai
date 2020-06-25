@@ -934,13 +934,8 @@ void PhysXInterface::ShutdownPhysX() {
     self->gScene->removeArticulation(*articulation);
   }
   for(PxRigidActor* a: self->actors) if(a) {
-      rai::Frame* f = (rai::Frame*) a->userData;
-
-      // only delete actors not belonging to an articulation
-      if(!f->ats.find<double>("articulated")){
         self->gScene->removeActor(*a);
         a->release();
-      }
     }
   if(self->gScene) {
     self->gScene->release();
