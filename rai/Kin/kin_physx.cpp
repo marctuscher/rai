@@ -928,20 +928,20 @@ void PhysXInterface_self::addLink(rai::Frame* f, int verbose) {
 }
 
 void PhysXInterface::ShutdownPhysX() {
-  //  self->mMaterial
-  //  self->plane
-  //  self->planeShape
+
+  // delete articulations
   for (PxArticulationReducedCoordinate* articulation: self->articulations){
     self->gScene->removeArticulation(*articulation);
   }
   for(PxRigidActor* a: self->actors) if(a) {
-      self->gScene->removeActor(*a);
-      a->release();
+      rai::Frame* f = (rai::Frame*) a->userData;
+
+      // only delete actors not belonging to an articulation
+      if(!f->ats.find<double>("articulated")){
+        self->gScene->removeActor(*a);
+        a->release();
+      }
     }
-//  if(self->connection) {
-//    self->connection->release();
-//    self->connection=nullptr;
-//  }
   if(self->gScene) {
     self->gScene->release();
     self->gScene = nullptr;
@@ -950,10 +950,6 @@ void PhysXInterface::ShutdownPhysX() {
     delete self->gl;
     self->gl=nullptr;
   }
-
-//  mCooking->release();
-//  mPhysics->release();
-  //  mFoundation->release();
 }
 
 void DrawActor(PxRigidActor* actor, rai::Frame* frame) {
