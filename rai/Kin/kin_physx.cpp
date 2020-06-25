@@ -651,10 +651,10 @@ void PhysXInterface_self::addArticulatedLinks(FrameL links, int verbose){
           case rai::JT_hingeZ:
           {
             joint->setJointType(PxArticulationJointType::eREVOLUTE);
-            if (f->ats.find<arr>("limit"))
+            if (f->ats.find<arr>("limits"))
             {
               joint->setMotion(PxArticulationAxis::eTWIST, PxArticulationMotion::eLIMITED);
-              arr limits = f->ats.get<arr>("limit");
+              arr limits = f->ats.get<arr>("limits");
               joint->setLimit(PxArticulationAxis::eTWIST, limits(0), limits(1));
             }
             else
@@ -676,10 +676,10 @@ void PhysXInterface_self::addArticulatedLinks(FrameL links, int verbose){
           case rai::JT_transX:
           {
             joint->setJointType(PxArticulationJointType::ePRISMATIC);
-            if (f->ats.find<arr>("limit"))
+            if (f->ats.find<arr>("limits"))
             {
               joint->setMotion(PxArticulationAxis::eX, PxArticulationMotion::eLIMITED);
-              arr limits = f->ats.get<arr>("limit");
+              arr limits = f->ats.get<arr>("limits");
               joint->setLimit(PxArticulationAxis::eX, limits(0), limits(1));
             }
             else
@@ -696,10 +696,10 @@ void PhysXInterface_self::addArticulatedLinks(FrameL links, int verbose){
           case rai::JT_transY:
           {
             joint->setJointType(PxArticulationJointType::ePRISMATIC);
-            if (f->ats.find<arr>("limit"))
+            if (f->ats.find<arr>("limits"))
             {
               joint->setMotion(PxArticulationAxis::eY, PxArticulationMotion::eLIMITED);
-              arr limits = f->ats.get<arr>("limit");
+              arr limits = f->ats.get<arr>("limits");
               joint->setLimit(PxArticulationAxis::eY, limits(0), limits(1));
             }
             else
@@ -716,10 +716,10 @@ void PhysXInterface_self::addArticulatedLinks(FrameL links, int verbose){
           case rai::JT_transZ:
           {
             joint->setJointType(PxArticulationJointType::ePRISMATIC);
-            if (f->ats.find<arr>("limit"))
+            if (f->ats.find<arr>("limits"))
             {
               joint->setMotion(PxArticulationAxis::eZ, PxArticulationMotion::eLIMITED);
-              arr limits = f->ats.get<arr>("limit");
+              arr limits = f->ats.get<arr>("limits");
               joint->setLimit(PxArticulationAxis::eZ, limits(0), limits(1));
             }
             else
