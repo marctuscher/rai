@@ -342,7 +342,7 @@ void PhysXInterface::pushKinematicStates(const FrameL &frames, const arr &q_dot)
 }
 
 void PhysXInterface::pushFullState(const FrameL& frames, const arr& frameVelocities, bool onlyKinematic) {
-  self->setInitialState(frames);
+  self->setInitialState(frames); // set the state of the articulation. Velocities will be zeroed
   for(rai::Frame* f : frames) {
     if(self->actors.N <= f->ID) continue;
     PxRigidActor* a = self->actors(f->ID);
