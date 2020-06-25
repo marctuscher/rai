@@ -136,11 +136,12 @@ void Simulation::step(const arr& u_control, double tau, ControlMode u_mode) {
 
   //-- perform control using C
   time += tau;
+  arr q;
   if(u_mode==_none){
   } else if(u_mode==_position){
     C.setJointState(ucontrol);
   } else if(u_mode==_velocity){
-    arr q = C.getJointState();
+    q = C.getJointState();
     q += tau * ucontrol;
     C.setJointState(q);
   } else NIY;
@@ -153,9 +154,9 @@ void Simulation::step(const arr& u_control, double tau, ControlMode u_mode) {
   //-- call the physics ending
   if(engine==_physx) {
     if (u_mode == _velocity){
-      self->physx->pushKinematicStates(C.frames, u_control);
+      self->physx->pushKinematicStates(C.frames, q, u_control);
     }else{
-      self->physx->pushKinematicStates(C.frames);
+      self->physx->pushKinematicStates(C.frames, u_control);
     }
     self->physx->step(tau);
     self->physx->pullDynamicStates(C.frames, self->frameVelocities);

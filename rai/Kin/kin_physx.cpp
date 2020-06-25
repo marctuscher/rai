@@ -285,7 +285,7 @@ void PhysXInterface::changeObjectType(rai::Frame* f, int _type){
   self->actorTypes(f->ID) = type;
 }
 
-void PhysXInterface::pushKinematicStates(const FrameL &frames, const arr &q_dot)
+void PhysXInterface::pushKinematicStates(const FrameL &frames, const arr &q, const arr &q_dot)
 {
   for (rai::Frame *f : frames)
   {
@@ -293,14 +293,13 @@ void PhysXInterface::pushKinematicStates(const FrameL &frames, const arr &q_dot)
     {
       PxArticulationJointReducedCoordinate *joint = self->joints(f->ID);
       int qIndex = f->joint->qIndex;
-      arr q = f->joint->calc_q_from_Q(f->joint->Q());
       switch (f->joint->type)
       {
       case rai::JT_hingeX:
       case rai::JT_hingeY:
       case rai::JT_hingeZ:
       {
-        joint->setDriveTarget(PxArticulationAxis::eTWIST, q.scalar());
+        joint->setDriveTarget(PxArticulationAxis::eTWIST, q(qIndex));
         if (!!q_dot)
         {
           joint->setDriveVelocity(PxArticulationAxis::eTWIST, q_dot(qIndex));
@@ -309,7 +308,7 @@ void PhysXInterface::pushKinematicStates(const FrameL &frames, const arr &q_dot)
       }
       case rai::JT_transX:
       {
-        joint->setDriveTarget(PxArticulationAxis::eX, q.scalar());
+        joint->setDriveTarget(PxArticulationAxis::eX, q(qIndex));
         if (!!q_dot)
         {
           joint->setDriveVelocity(PxArticulationAxis::eX, q_dot(qIndex));
@@ -318,7 +317,7 @@ void PhysXInterface::pushKinematicStates(const FrameL &frames, const arr &q_dot)
       }
       case rai::JT_transY:
       {
-        joint->setDriveTarget(PxArticulationAxis::eY, q.scalar());
+        joint->setDriveTarget(PxArticulationAxis::eY, q(qIndex));
         if (!!q_dot)
         {
           joint->setDriveVelocity(PxArticulationAxis::eY, q_dot(qIndex));
@@ -327,7 +326,7 @@ void PhysXInterface::pushKinematicStates(const FrameL &frames, const arr &q_dot)
       }
       case rai::JT_transZ:
       {
-        joint->setDriveTarget(PxArticulationAxis::eZ, q.scalar());
+        joint->setDriveTarget(PxArticulationAxis::eZ, q(qIndex));
         if (!!q_dot)
         {
           joint->setDriveVelocity(PxArticulationAxis::eZ, q_dot(qIndex));
@@ -594,7 +593,6 @@ void PhysXInterface_self::addArticulatedLinks(FrameL links, int verbose){
           mMaterial = physxSingleton().mPhysics->createMaterial(fric, fric, .1f);
         }
         PxShape *shape = PxRigidActorExt::createExclusiveShape(*link, *geometry, *mMaterial);
-        // shape->setRestOffset(0.001f);
         if (&s->frame != f)
         {
           if (s->frame.parent == f)
@@ -902,7 +900,6 @@ void PhysXInterface_self::addLink(rai::Frame* f, int verbose) {
         mMaterial = physxSingleton().mPhysics->createMaterial(fric, fric, .1f);
       }
       PxShape *shape = PxRigidActorExt::createExclusiveShape(*actor, *geometry, *mMaterial);
-      shape->setRestOffset(0.001f);
       if(&s->frame!=f) {
         if(s->frame.parent==f) {
           shape->setLocalPose(conv_Transformation2PxTrans(s->frame.get_Q()));

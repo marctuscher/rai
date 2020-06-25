@@ -22,7 +22,7 @@ struct PhysXInterface : GLDrawer {
 
   void step(double tau=.01);
 
-  void pushKinematicStates(const FrameL& frames, const arr& q_dot=NoArr);
+  void pushKinematicStates(const FrameL& frames, const arr &q, const arr& q_dot=NoArr);
   void pushFullState(const FrameL& frames, const arr& frameVelocities=NoArr, bool onlyKinematic=false);
   void pullDynamicStates(FrameL& frames, arr& frameVelocities=NoArr);
 
