@@ -342,10 +342,12 @@ void PhysXInterface::pushKinematicStates(const FrameL &frames, const arr &q_dot)
 }
 
 void PhysXInterface::pushFullState(const FrameL& frames, const arr& frameVelocities, bool onlyKinematic) {
+  self->setInitialState(frames);
   for(rai::Frame* f : frames) {
     if(self->actors.N <= f->ID) continue;
     PxRigidActor* a = self->actors(f->ID);
     if(!a) continue; //f is not an actor
+    if(f->ats.find<double>("articulated")) continue; // f belongs to a articulations
 
     bool isKinematic = self->actorTypes(f->ID)==rai::BT_kinematic;
     if(onlyKinematic && !isKinematic) continue;
