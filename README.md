@@ -1,5 +1,7 @@
 This branch aims to incorporate PhysX 4.1 to enhance physic simulation for RL, controlled by rai.
 
+Details on the usage and updated .g files can be found in `test/Kin/physx/physx4`.
+
 ## Howto PhysX 4.1
 
 ```
