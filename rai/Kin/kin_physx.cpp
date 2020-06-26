@@ -257,7 +257,7 @@ void PhysXInterface::pullDynamicStates(FrameL& frames, arr& frameVelocities) {
     PxRigidActor* a = self->actors(f->ID);
     if(!a) continue;
 
-    if(true /*self->actorTypes(f->ID) == rai::BT_dynamic*/) {
+    if(self->actorTypes(f->ID) == rai::BT_dynamic) {
       rai::Transformation X;
       PxTrans2raiTrans(X, a->getGlobalPose());
       f->set_X() = X;
