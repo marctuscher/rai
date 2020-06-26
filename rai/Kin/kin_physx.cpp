@@ -291,10 +291,6 @@ void PhysXInterface::pushKinematicStates(const FrameL &frames, const arr &q, con
   {
     if (f->ats.find<arr>("drive"))
     {
-      // PxArticulationLink *link = (PxArticulationLink*)self->actors(f->ID);
-      // if (link->getArticulation().isSleeping()){
-      //   link->getArticulation().wakeUp();
-      // } 
       PxArticulationJointReducedCoordinate *joint = self->joints(f->ID);
       int qIndex = f->joint->qIndex;
       switch (f->joint->type)
@@ -622,32 +618,43 @@ void PhysXInterface_self::addArticulatedLinks(FrameL links, int verbose){
     }
     }
 
-    // add articuations to the scene after finished assembly
     for (PxArticulationReducedCoordinate *finished_articulation : articulations)
     {
-      // create a cache to set an initial joint state (q_home)
+      // configure joints of the articulation
       for (PxU32 i = 0; i < finished_articulation->getNbLinks(); ++i)
       {
         PxArticulationLink *parentLink;
         finished_articulation->getLinks(&parentLink, 1, i);
+
+        // all links except the root link have an inbound joint. The root link can be ignored (and is a the robots base frame in the .g file)
         for (PxU32 j = 0; j < parentLink->getNbChildren(); ++j)
         {
           PxArticulationLink *child;
           parentLink->getChildren(&child, 1, j);
           PxArticulationJointReducedCoordinate *joint = static_cast<PxArticulationJointReducedCoordinate *>(child->getInboundJoint());
+
+          // get the rai::Frame corresponding to this joint
           rai::Frame *f = (rai::Frame *)child->userData;
           while (joints.N <= f->ID)
             joints.append(nullptr);
 
           joints(f->ID) = joint;
 
+          // get the transfrom relative to the last link.
           rai::Transformation parentTransform;
           f->parent->getUpwardLink(parentTransform);
+
+          // transform to parent
           PxTransform A = conv_Transformation2PxTrans(parentTransform);
+          
+          // transfrom to child is Identity
           PxTransform B = Id_PxTrans();
 
           joint->setParentPose(A);
           joint->setChildPose(B.getInverse());
+
+
+          // configure limits, drive and axis of the joint
           switch (f->joint->type)
           {
           case rai::JT_hingeX:
@@ -742,16 +749,23 @@ void PhysXInterface_self::addArticulatedLinks(FrameL links, int verbose){
           }
         }
       }
-      // zero all velocties
+
+      // add articuations to the scene after finished assembly
       finished_articulation->setArticulationFlag(PxArticulationFlag::eFIX_BASE, true);
       gScene->addArticulation(*finished_articulation);
     }
 }
 
+/**
+ * Set initial state of the articulations
+ * 
+ * @param frames List of Frames
+ **/
 void PhysXInterface_self::setInitialState(const FrameL frames){
-
   for (PxArticulationReducedCoordinate *finished_articulation : articulations)
   {
+
+    // joint states can only be set indirectly by applying a cache
     PxArticulationCache *cache = finished_articulation->createCache();
     finished_articulation->copyInternalStateToCache(*cache, PxArticulationCache::eALL);
     for (rai::Frame *f : frames)
@@ -760,6 +774,8 @@ void PhysXInterface_self::setInitialState(const FrameL frames){
       {
         PxArticulationJointReducedCoordinate *joint = joints(f->ID);
         arr q = f->joint->calc_q_from_Q(f->joint->Q());
+
+        // assuming that a joint only has a single degree of freedom
         cache->jointPosition[joint->getParentArticulationLink().getLinkIndex()] = q.scalar();
       }
     }
