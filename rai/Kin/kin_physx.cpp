@@ -291,10 +291,10 @@ void PhysXInterface::pushKinematicStates(const FrameL &frames, const arr &q, con
   {
     if (f->ats.find<arr>("drive"))
     {
-      PxArticulationLink *link = (PxArticulationLink*)self->actors(f->ID);
-      if (link->getArticulation().isSleeping()){
-        link->getArticulation().wakeUp();
-      } 
+      // PxArticulationLink *link = (PxArticulationLink*)self->actors(f->ID);
+      // if (link->getArticulation().isSleeping()){
+      //   link->getArticulation().wakeUp();
+      // } 
       PxArticulationJointReducedCoordinate *joint = self->joints(f->ID);
       int qIndex = f->joint->qIndex;
       switch (f->joint->type)
