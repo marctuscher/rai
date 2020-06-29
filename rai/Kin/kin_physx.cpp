@@ -172,6 +172,9 @@ PhysXInterface::PhysXInterface(const rai::Configuration& C, int verbose): self(n
   sceneDesc.gravity = PxVec3(0.f, 0.f, -9.8f);
 
   sceneDesc.solverType = PxSolverType::eTGS;
+  
+  // use newer Broad-Phase algorithmn
+  sceneDesc.broadPhaseType = PxBroadPhaseType::eABP;
 
 
   if(!sceneDesc.cpuDispatcher) {
