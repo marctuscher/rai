@@ -32,6 +32,7 @@
 
 using namespace physx;
 
+
 struct PhysXSingleton{
   PxFoundation* mFoundation = nullptr;
   PxPhysics* mPhysics = nullptr;
@@ -92,6 +93,75 @@ PxVec3 conv_arr2PxVec3(const arr& x){
   return PxVec3(x(0), x(1), x(2));
 }
 
+
+PxFilterFlags contactReportFilterShader(PxFilterObjectAttributes attributes0, PxFilterData filterData0, 
+										PxFilterObjectAttributes attributes1, PxFilterData filterData1,
+										PxPairFlags& pairFlags, const void* constantBlock, PxU32 constantBlockSize)
+{
+	PX_UNUSED(attributes0);
+	PX_UNUSED(attributes1);
+	PX_UNUSED(filterData0);
+	PX_UNUSED(filterData1);
+	PX_UNUSED(constantBlockSize);
+	PX_UNUSED(constantBlock);
+
+	// all initial and persisting reports for everything, with per-point data
+	pairFlags = PxPairFlag::eSOLVE_CONTACT | PxPairFlag::eDETECT_DISCRETE_CONTACT
+			  |	PxPairFlag::eNOTIFY_TOUCH_FOUND 
+			  | PxPairFlag::eNOTIFY_TOUCH_PERSISTS
+			  | PxPairFlag::eNOTIFY_CONTACT_POINTS;
+	return PxFilterFlag::eDEFAULT;
+}
+
+class ContactReportCallback: public PxSimulationEventCallback
+{
+  public:
+    rai::Array<std::shared_ptr<rai::ContactPair>> contactPairs;
+  private:
+	void onConstraintBreak(PxConstraintInfo* constraints, PxU32 count)	{ PX_UNUSED(constraints); PX_UNUSED(count); }
+	void onWake(PxActor** actors, PxU32 count)							{ PX_UNUSED(actors); PX_UNUSED(count); }
+	void onSleep(PxActor** actors, PxU32 count)							{ PX_UNUSED(actors); PX_UNUSED(count); }
+	void onTrigger(PxTriggerPair* pairs, PxU32 count)					{ PX_UNUSED(pairs); PX_UNUSED(count); }
+	void onAdvance(const PxRigidBody*const*, const PxTransform*, const PxU32) {}
+	void onContact(const PxContactPairHeader& pairHeader, const PxContactPair* pairs, PxU32 nbPairs) 
+	{
+		PX_UNUSED((pairHeader));
+
+		std::vector<PxContactPairPoint> contactPoints;
+		
+		for(PxU32 i=0;i<nbPairs;i++)
+		{
+			PxU32 contactCount = pairs[i].contactCount;
+      
+			if(contactCount)
+			{
+      rai::Frame* _first = (rai::Frame*) pairs[i].shapes[0]->getActor()->userData;
+      rai::Frame* _second = (rai::Frame*) pairs[i].shapes[1]->getActor()->userData;
+      if (_first->ats.find<double>("physx_contacts") && _second->ats.find<double>("physx_contacts")){
+        while (contactPairs.N <= _first->ID){
+          contactPairs.append(nullptr);
+        }
+
+        contactPoints.resize(contactCount);
+        pairs[i].extractContacts(&contactPoints[0], contactCount);
+        arr impulses;
+        arr positions;
+        for (PxU32 j = 0; j < contactCount; j++)
+        {
+          impulses.append(conv_PxVec3_arr(contactPoints[j].impulse));
+          positions.append(conv_PxVec3_arr(contactPoints[j].position));
+        }
+        positions.reshape(-1, 3);
+        impulses.reshape(-1, 3);
+        cout << impulses << endl;
+        std::shared_ptr<rai::ContactPair> contactPair = make_shared<rai::ContactPair>(_first, _second, positions, impulses);
+        contactPairs(_first->ID) = contactPair;
+      }
+      }
+    }
+  }
+};
+
 // ============================================================================
 //stuff from Samples/PxToolkit
 
@@ -142,6 +212,7 @@ struct PhysXInterface_self {
   rai::Configuration* C=nullptr;
   rai::Array<rai::Array<PxArticulationLink*>> articulation_links;
   rai::Array<PxArticulationReducedCoordinate*> articulations;
+  ContactReportCallback gContactReportCallback;
 
   uint stepCount=0;
 
@@ -175,6 +246,10 @@ PhysXInterface::PhysXInterface(const rai::Configuration& C, int verbose): self(n
   
   // use newer Broad-Phase algorithmn
   sceneDesc.broadPhaseType = PxBroadPhaseType::eABP;
+
+  sceneDesc.filterShader = contactReportFilterShader;
+
+  sceneDesc.simulationEventCallback = &self->gContactReportCallback;
 
 
   if(!sceneDesc.cpuDispatcher) {
@@ -238,6 +313,7 @@ PhysXInterface::PhysXInterface(const rai::Configuration& C, int verbose): self(n
   //  }
 }
 
+
 PhysXInterface::~PhysXInterface() {
   ShutdownPhysX();
   delete self;
@@ -250,6 +326,10 @@ void PhysXInterface::step(double tau) {
   //...perform useful work here using previous frame's state data
   while(!self->gScene->fetchResults()) {
   }
+}
+
+rai::Array<std::shared_ptr<rai::ContactPair>> PhysXInterface::getContacts(){
+  return self->gContactReportCallback.contactPairs;
 }
 
 void PhysXInterface::pullDynamicStates(FrameL& frames, arr& frameVelocities) {

@@ -16,4 +16,6 @@ DEPEND = Core Geo GeoOptim Algo Gui
 SRCS = $(shell find . -maxdepth 1 -name '*.cpp' )
 OBJS = $(SRCS:%.cpp=%.o)
 
+CXXFLAGS += -std=c++14
+
 include $(BASE)/build/generic.mk
