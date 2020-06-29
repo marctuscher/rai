@@ -22,11 +22,13 @@ namespace rai {
       rai::Frame* second;
       arr contact_positions;
       arr contact_impulses;
-      ContactPair(rai::Frame* _first, rai::Frame* _second, const arr& _contact_positions, const arr& _contact_impulses) {
+      bool isContact;
+      ContactPair(rai::Frame* _first, rai::Frame* _second, const arr& _contact_positions, const arr& _contact_impulses, const bool& _isContact) {
         first = _first;
         second = _second;
         contact_positions = _contact_positions;
         contact_impulses = _contact_impulses;
+        isContact = _isContact;
       };
   };
 }
@@ -47,7 +49,8 @@ struct PhysXInterface : GLDrawer {
   void ShutdownPhysX();
 
   void glDraw(OpenGL&);
-  void watch(bool pause=false, const char* txt=nullptr);
+  void watch(bool pause = false, const char *txt = nullptr);
+  bool doesGripperGraspObject(const rai::Frame* gripper, const rai::Frame* object);
 
   void addForce(rai::Vector& force, rai::Frame* b);
   rai::Array<std::shared_ptr<rai::ContactPair>> getContacts();

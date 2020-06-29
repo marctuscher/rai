@@ -29,7 +29,6 @@ struct Simulation_self {
   std::shared_ptr<PhysXInterface> physx;
 
   void updateDisplayData(double _time, const arr& _frameState, const ProxyA& _proxies);
-  void updateDisplayData(double _time, rai::String _contactInfo,const arr& _frameState, const ProxyA& _proxies);
   void updateDisplayData(const byteA& _image, const floatA& _depth);
 };
 
@@ -176,20 +175,8 @@ void Simulation::step(const arr& u_control, double tau, ControlMode u_mode) {
   for(ptr<SimulationImp>& imp : imps) if(imp->when==SimulationImp::_afterPhysics){
     imp->modConfiguration(*this);
   }
-  rai::String contactInfo;
-  if (engine == _physx)
-  {
-    rai::Array<std::shared_ptr<rai::ContactPair>> contacts = self->physx->getContacts();
-    for (uint i = 0; i< contacts.N ; i++)
-    {
-      if(!contacts(i))  continue;
 
-      arr contact_forces = contacts(i) -> contact_impulses / tau;
-      contactInfo << STRING(contacts(i) -> first->name) << STRING(" ") << STRING(contacts(i)->second->name) << " : " << STRING(contact_forces) << "\n";
-    }
-  }
-
-  if(verbose>0) self->updateDisplayData(time, contactInfo, C.getFrameState(), C.proxies);
+  if(verbose>0) self->updateDisplayData(time, C.getFrameState(), C.proxies);
 }
 
 void Simulation::openGripper(const char* gripperFrameName, double width, double speed){
@@ -328,6 +315,16 @@ bool Simulation::getGripperIsGrasping(const char* gripperFrameName){
   return false;
 }
 
+bool Simulation::doesGripperGraspObject(const char* gripperFrameName, const char* objectName){
+rai::Frame *gripper = C.getFrameByName(gripperFrameName);
+rai::Frame *object = C.getFrameByName(objectName);
+  if(!gripper){
+    LOG(-1) <<"you passed me a non-existing gripper name!";
+    return false;
+  }
+  return self->physx->doesGripperGraspObject(gripper, object);
+}
+
 CameraView& Simulation::cameraview() {
   if(!self->cameraview) {
     self->cameraview = make_shared<CameraView>(C, true, false);
@@ -374,7 +371,6 @@ struct Simulation_DisplayThread : Thread, GLDrawer {
   byteA image;
   floatA depth;
   byteA segmentation;
-  rai::String contactInfo;
 
   Simulation_DisplayThread(const Configuration& C)
     : Thread("Sim_DisplayThread", .05),
@@ -395,7 +391,7 @@ struct Simulation_DisplayThread : Thread, GLDrawer {
     double t = time;
     mux.unlock();
 
-    gl.update(STRING("t:" <<t << " " << contactInfo), true);
+    gl.update(STRING("t:" <<t), true);
   }
 
   void glDraw(OpenGL& gl) {
@@ -431,11 +427,10 @@ struct Simulation_DisplayThread : Thread, GLDrawer {
   }
 };
 
-void Simulation_self::updateDisplayData(double _time, rai::String _contactInfo, const arr& _frameState, const ProxyA& _proxies) {
+void Simulation_self::updateDisplayData(double _time, const arr& _frameState, const ProxyA& _proxies) {
   CHECK(display, "");
   display->mux.lock(RAI_HERE);
   display->time = _time;
-  display->contactInfo = _contactInfo;
   display->Ccopy.setFrameState(_frameState);
   display->Ccopy.copyProxies(_proxies);
   display->mux.unlock();

@@ -54,6 +54,7 @@ void init_Simulation(pybind11::module &m) {
            "",
            pybind11::arg("gripperFrameName")
            )
+      .def("doesGripperGraspObject", &rai::Simulation::doesGripperGraspObject, "", pybind11::arg("gripperFrameName"), pybind11::arg("objectName"))
 
       .def("getGripperIsGrasping", &rai::Simulation::getGripperIsGrasping,
            "",

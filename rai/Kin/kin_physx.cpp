@@ -116,7 +116,7 @@ PxFilterFlags contactReportFilterShader(PxFilterObjectAttributes attributes0, Px
 class ContactReportCallback: public PxSimulationEventCallback
 {
   public:
-    rai::Array<std::shared_ptr<rai::ContactPair>> contactPairs;
+    rai::Array<rai::Array<std::shared_ptr<rai::ContactPair>>> contactPairs;
   private:
 	void onConstraintBreak(PxConstraintInfo* constraints, PxU32 count)	{ PX_UNUSED(constraints); PX_UNUSED(count); }
 	void onWake(PxActor** actors, PxU32 count)							{ PX_UNUSED(actors); PX_UNUSED(count); }
@@ -127,6 +127,7 @@ class ContactReportCallback: public PxSimulationEventCallback
 	{
 		PX_UNUSED((pairHeader));
 
+    // clear array ... maybe one should have a map or something like that
 		std::vector<PxContactPairPoint> contactPoints;
 		
 		for(PxU32 i=0;i<nbPairs;i++)
@@ -137,25 +138,35 @@ class ContactReportCallback: public PxSimulationEventCallback
 			{
       rai::Frame* _first = (rai::Frame*) pairs[i].shapes[0]->getActor()->userData;
       rai::Frame* _second = (rai::Frame*) pairs[i].shapes[1]->getActor()->userData;
+      // this is horrible!!!
+      while (contactPairs.d0 <= _first->ID){
+        contactPairs.append(rai::Array<std::shared_ptr<rai::ContactPair>>());
+      }
+      while (contactPairs(_first->ID).d0 <= _second->ID){
+        contactPairs(_first->ID).append(nullptr);
+      }
       if (_first->ats.find<double>("physx_contacts") && _second->ats.find<double>("physx_contacts")){
-        while (contactPairs.N <= _first->ID){
-          contactPairs.append(nullptr);
-        }
 
         contactPoints.resize(contactCount);
         pairs[i].extractContacts(&contactPoints[0], contactCount);
         arr impulses;
         arr positions;
+        arr separations;
+        bool isContact = false;
         for (PxU32 j = 0; j < contactCount; j++)
         {
           impulses.append(conv_PxVec3_arr(contactPoints[j].impulse));
           positions.append(conv_PxVec3_arr(contactPoints[j].position));
+          separations.append((double) contactPoints[i].separation);
+          isContact = contactPoints[i].separation < 0.005;
         }
+
+        cout << _first->name << " " << _second->name << " " << isContact <<  " " <<  endl;
         positions.reshape(-1, 3);
         impulses.reshape(-1, 3);
-        cout << impulses << endl;
-        std::shared_ptr<rai::ContactPair> contactPair = make_shared<rai::ContactPair>(_first, _second, positions, impulses);
-        contactPairs(_first->ID) = contactPair;
+
+        std::shared_ptr<rai::ContactPair> contactPair = make_shared<rai::ContactPair>(_first, _second, positions, impulses, isContact);
+        contactPairs(_first->ID)(_second->ID) = contactPair;
       }
       }
     }
@@ -328,8 +339,51 @@ void PhysXInterface::step(double tau) {
   }
 }
 
-rai::Array<std::shared_ptr<rai::ContactPair>> PhysXInterface::getContacts(){
-  return self->gContactReportCallback.contactPairs;
+
+
+bool PhysXInterface::doesGripperGraspObject(const rai::Frame* gripper, const rai::Frame* object){
+  // this implementation of this feature seems completely insane and stupid. 
+
+  // get finger frames
+  rai::Frame *fing1 = gripper->children(0);
+  while (!fing1->shape && fing1->children.N)
+    fing1 = fing1->children(0);
+
+  rai::Frame *fing2 = gripper->children(1);
+  while (!fing2->shape && fing2->children.N)
+    fing2 = fing2->children(0);
+
+  std::shared_ptr<rai::ContactPair> cp1, cp2, cp3, cp4 = nullptr;
+  bool fing1Contact = false;
+  bool fing2Contact = false;
+  cout << fing1->name << fing2->name << endl;
+  if (self->gContactReportCallback.contactPairs.d0 > fing1->ID && self->gContactReportCallback.contactPairs(fing1->ID).d0 > object->ID)
+  {
+     cp1 = self->gContactReportCallback.contactPairs(fing1->ID)(object->ID);
+  }
+  if ( self->gContactReportCallback.contactPairs.d0 > object->ID && self->gContactReportCallback.contactPairs(object->ID).d0 > fing1->ID)
+  {
+     cp2 = self->gContactReportCallback.contactPairs(object->ID)(fing1->ID);
+  }
+  if (self->gContactReportCallback.contactPairs.d0 > fing2->ID && self->gContactReportCallback.contactPairs(fing2->ID).d0 > object->ID)
+  {
+     cp3 = self->gContactReportCallback.contactPairs(fing2->ID)(object->ID);
+  }
+  if ( self->gContactReportCallback.contactPairs.d0 > object->ID && self->gContactReportCallback.contactPairs(object->ID).d0 > fing2->ID)
+  {
+     cp4 = self->gContactReportCallback.contactPairs(object->ID)(fing2->ID);
+  }
+
+  if (cp1)
+    fing1Contact = cp1->isContact;
+  if (cp2)
+    fing1Contact = cp2->isContact || fing1Contact;
+  if (cp3)
+    fing2Contact = cp3->isContact;
+  if (cp4)
+    fing2Contact = cp4->isContact || fing1Contact;
+
+  return fing1Contact && fing2Contact;
 }
 
 void PhysXInterface::pullDynamicStates(FrameL& frames, arr& frameVelocities) {
