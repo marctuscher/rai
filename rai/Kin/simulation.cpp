@@ -184,10 +184,8 @@ void Simulation::step(const arr& u_control, double tau, ControlMode u_mode) {
     {
       if(!contacts(i))  continue;
 
-      arr contact_sum = sum(contacts(i)->contact_impulses, 0);
-      contact_sum /= tau;
-
-      contactInfo << STRING(contacts(i)->first->name) << STRING(" ") << STRING(contacts(i)->second->name)<< " : " <<STRING (contact_sum) << "\n";
+      arr contact_forces = contacts(i) -> contact_impulses / tau;
+      contactInfo << STRING(contacts(i) -> first->name) << STRING(" ") << STRING(contacts(i)->second->name) << " : " << STRING(contact_forces) << "\n";
     }
   }
 
