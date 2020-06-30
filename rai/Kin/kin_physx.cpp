@@ -127,47 +127,47 @@ class ContactReportCallback: public PxSimulationEventCallback
 	{
 		PX_UNUSED((pairHeader));
 
-    // clear array ... maybe one should have a map or something like that
 		std::vector<PxContactPairPoint> contactPoints;
-		
-		for(PxU32 i=0;i<nbPairs;i++)
-		{
-			PxU32 contactCount = pairs[i].contactCount;
-      
-			if(contactCount)
-			{
-      rai::Frame* _first = (rai::Frame*) pairs[i].shapes[0]->getActor()->userData;
-      rai::Frame* _second = (rai::Frame*) pairs[i].shapes[1]->getActor()->userData;
+
+    for (PxU32 i = 0; i < nbPairs; i++)
+    {
+      PxU32 contactCount = pairs[i].contactCount;
+
+      rai::Frame *_first = (rai::Frame *)pairs[i].shapes[0]->getActor()->userData;
+      rai::Frame *_second = (rai::Frame *)pairs[i].shapes[1]->getActor()->userData;
       // this is horrible!!!
-      while (contactPairs.d0 <= _first->ID){
+      while (contactPairs.d0 <= _first->ID)
+      {
         contactPairs.append(rai::Array<std::shared_ptr<rai::ContactPair>>());
       }
-      while (contactPairs(_first->ID).d0 <= _second->ID){
+      while (contactPairs(_first->ID).d0 <= _second->ID)
+      {
         contactPairs(_first->ID).append(nullptr);
       }
-      if (_first->ats.find<double>("physx_contacts") && _second->ats.find<double>("physx_contacts")){
 
-        contactPoints.resize(contactCount);
-        pairs[i].extractContacts(&contactPoints[0], contactCount);
-        arr impulses;
-        arr positions;
-        arr separations;
-        bool isContact = false;
-        for (PxU32 j = 0; j < contactCount; j++)
+      if (_first->ats.find<double>("physx_contacts") && _second->ats.find<double>("physx_contacts"))
+      {
+        if (contactCount)
         {
-          impulses.append(conv_PxVec3_arr(contactPoints[j].impulse));
-          positions.append(conv_PxVec3_arr(contactPoints[j].position));
-          separations.append((double) contactPoints[i].separation);
-          isContact = contactPoints[i].separation < 0.005;
+          contactPoints.resize(contactCount);
+          pairs[i].extractContacts(&contactPoints[0], contactCount);
+          arr impulses;
+          arr positions;
+          arr separations;
+          bool isContact = false;
+          for (PxU32 j = 0; j < contactCount; j++)
+          {
+            impulses.append(conv_PxVec3_arr(contactPoints[j].impulse));
+            positions.append(conv_PxVec3_arr(contactPoints[j].position));
+            separations.append((double)contactPoints[i].separation);
+            isContact = contactPoints[i].separation < 0.007 || isContact;
+          }
+          positions.reshape(-1, 3);
+          impulses.reshape(-1, 3);
+
+          std::shared_ptr<rai::ContactPair> contactPair = make_shared<rai::ContactPair>(_first, _second, positions, impulses, isContact);
+          contactPairs(_first->ID)(_second->ID) = contactPair;
         }
-
-        cout << _first->name << " " << _second->name << " " << isContact <<  " " <<  endl;
-        positions.reshape(-1, 3);
-        impulses.reshape(-1, 3);
-
-        std::shared_ptr<rai::ContactPair> contactPair = make_shared<rai::ContactPair>(_first, _second, positions, impulses, isContact);
-        contactPairs(_first->ID)(_second->ID) = contactPair;
-      }
       }
     }
   }
@@ -356,33 +356,30 @@ bool PhysXInterface::doesGripperGraspObject(const rai::Frame* gripper, const rai
   std::shared_ptr<rai::ContactPair> cp1, cp2, cp3, cp4 = nullptr;
   bool fing1Contact = false;
   bool fing2Contact = false;
-  cout << fing1->name << fing2->name << endl;
-  if (self->gContactReportCallback.contactPairs.d0 > fing1->ID && self->gContactReportCallback.contactPairs(fing1->ID).d0 > object->ID)
-  {
-     cp1 = self->gContactReportCallback.contactPairs(fing1->ID)(object->ID);
-  }
-  if ( self->gContactReportCallback.contactPairs.d0 > object->ID && self->gContactReportCallback.contactPairs(object->ID).d0 > fing1->ID)
-  {
-     cp2 = self->gContactReportCallback.contactPairs(object->ID)(fing1->ID);
-  }
-  if (self->gContactReportCallback.contactPairs.d0 > fing2->ID && self->gContactReportCallback.contactPairs(fing2->ID).d0 > object->ID)
-  {
-     cp3 = self->gContactReportCallback.contactPairs(fing2->ID)(object->ID);
-  }
-  if ( self->gContactReportCallback.contactPairs.d0 > object->ID && self->gContactReportCallback.contactPairs(object->ID).d0 > fing2->ID)
-  {
-     cp4 = self->gContactReportCallback.contactPairs(object->ID)(fing2->ID);
-  }
-
-  if (cp1)
-    fing1Contact = cp1->isContact;
-  if (cp2)
-    fing1Contact = cp2->isContact || fing1Contact;
-  if (cp3)
-    fing2Contact = cp3->isContact;
-  if (cp4)
-    fing2Contact = cp4->isContact || fing1Contact;
-
+    if (self->gContactReportCallback.contactPairs.d0 > fing1->ID && self->gContactReportCallback.contactPairs(fing1->ID).d0 > object->ID)
+    {
+      cp1 = self->gContactReportCallback.contactPairs(fing1->ID)(object->ID);
+    }
+    if (self->gContactReportCallback.contactPairs.d0 > object->ID && self->gContactReportCallback.contactPairs(object->ID).d0 > fing1->ID)
+    {
+      cp2 = self->gContactReportCallback.contactPairs(object->ID)(fing1->ID);
+    }
+    if (self->gContactReportCallback.contactPairs.d0 > fing2->ID && self->gContactReportCallback.contactPairs(fing2->ID).d0 > object->ID)
+    {
+      cp3 = self->gContactReportCallback.contactPairs(fing2->ID)(object->ID);
+    }
+    if (self->gContactReportCallback.contactPairs.d0 > object->ID && self->gContactReportCallback.contactPairs(object->ID).d0 > fing2->ID)
+    {
+      cp4 = self->gContactReportCallback.contactPairs(object->ID)(fing2->ID);
+    }
+    if (cp1)
+      fing1Contact = cp1->isContact;
+    if (cp2)
+      fing1Contact = cp2->isContact || fing1Contact;
+    if (cp3)
+      fing2Contact = cp3->isContact;
+    if (cp4)
+      fing2Contact = cp4->isContact || fing1Contact;
   return fing1Contact && fing2Contact;
 }
 
@@ -478,6 +475,13 @@ void PhysXInterface::pushKinematicStates(const FrameL &frames, const arr &q, con
 }
 
 void PhysXInterface::pushFullState(const FrameL& frames, const arr& frameVelocities, bool onlyKinematic) {
+  for (uint i = 0; i < self->gContactReportCallback.contactPairs.N; ++i)
+  {
+    for (uint j = 0; j < self->gContactReportCallback.contactPairs(i).N; ++j)
+    {
+      self->gContactReportCallback.contactPairs(i)(j) = nullptr;
+    }
+  }
   self->setInitialState(frames); // set the state of the articulation. Velocities will be zeroed
   for(rai::Frame* f : frames) {
     if(self->actors.N <= f->ID) continue;
