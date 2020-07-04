@@ -816,7 +816,7 @@ void PhysXInterface_self::addArticulatedLinks(FrameL links, int verbose){
             if (f->ats.find<arr>("drive"))
             {
               arr drive_values = f->ats.get<arr>("drive");
-              joint->setDrive(PxArticulationAxis::eTWIST, drive_values(0), drive_values(1), PX_MAX_F32);
+              joint->setDrive(PxArticulationAxis::eTWIST, drive_values(0), drive_values(1), PX_MAX_F32, PxArticulationDriveType::eTARGET);
             }
             break;
           }
@@ -841,7 +841,7 @@ void PhysXInterface_self::addArticulatedLinks(FrameL links, int verbose){
             if (f->ats.find<arr>("drive"))
             {
               arr drive_values = f->ats.get<arr>("drive");
-              joint->setDrive(PxArticulationAxis::eX, drive_values(0), drive_values(1), PX_MAX_F32);
+              joint->setDrive(PxArticulationAxis::eX, drive_values(0), drive_values(1), PX_MAX_F32, PxArticulationDriveType::eTARGET);
             }
             break;
           }
@@ -861,7 +861,7 @@ void PhysXInterface_self::addArticulatedLinks(FrameL links, int verbose){
             if (f->ats.find<arr>("drive"))
             {
               arr drive_values = f->ats.get<arr>("drive");
-              joint->setDrive(PxArticulationAxis::eY, drive_values(0), drive_values(1), PX_MAX_F32);
+              joint->setDrive(PxArticulationAxis::eY, drive_values(0), drive_values(1), PX_MAX_F32, PxArticulationDriveType::eTARGET);
             }
             break;
           }
@@ -881,7 +881,7 @@ void PhysXInterface_self::addArticulatedLinks(FrameL links, int verbose){
             if (f->ats.find<arr>("drive"))
             {
               arr drive_values = f->ats.get<arr>("drive");
-              joint->setDrive(PxArticulationAxis::eZ, drive_values(0), drive_values(1), PX_MAX_F32);
+              joint->setDrive(PxArticulationAxis::eZ, drive_values(0), drive_values(1), PX_MAX_F32, PxArticulationDriveType::eTARGET);
             }
             break;
           }
