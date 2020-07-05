@@ -131,30 +131,47 @@ class ContactReportCallback: public PxSimulationEventCallback
 
     for (PxU32 i = 0; i < nbPairs; i++)
     {
+      // cout << "get contact pair" << endl;
       PxU32 contactCount = pairs[i].contactCount;
 
       rai::Frame *_first = (rai::Frame *)pairs[i].shapes[0]->getActor()->userData;
+      // cout << "ferst: " << _first << endl;
       rai::Frame *_second = (rai::Frame *)pairs[i].shapes[1]->getActor()->userData;
+      // cout << "second: " << _second << endl;
+
+      if (!_first || !_second) continue;
+
+      // cout << "contactPairs.d0" << contactPairs.d0 << endl;
+      // cout << "_first->ID: " << _first->ID << endl;
       // this is horrible!!!
       while (contactPairs.d0 <= _first->ID)
       {
+        cout << "adding rows" << endl;
         contactPairs.append(rai::Array<std::shared_ptr<rai::ContactPair>>());
       }
+      cout << "contactPairs(_first->ID).d0" << contactPairs(_first->ID).d0 << endl;
+      cout << "_first->ID: " << _second->ID << contactPairs.d0 << endl;
       while (contactPairs(_first->ID).d0 <= _second->ID)
       {
+        cout << "adding cols" << endl;
         contactPairs(_first->ID).append(nullptr);
       }
 
+      cout << "findats" << endl;
       if (_first->ats.find<double>("physx_contacts") && _second->ats.find<double>("physx_contacts"))
       {
+        // cout << "Checking contact " <<  (uint) contactCount << endl;
         if (contactCount)
         {
+
           contactPoints.resize(contactCount);
+          // cout << "extracting contacts" << endl;
           pairs[i].extractContacts(&contactPoints[0], contactCount);
           arr impulses;
           arr positions;
           arr separations;
           bool isContact = false;
+          // cout << "iterating contacts" << endl;
           for (PxU32 j = 0; j < contactCount; j++)
           {
             impulses.append(conv_PxVec3_arr(contactPoints[j].impulse));
@@ -162,11 +179,16 @@ class ContactReportCallback: public PxSimulationEventCallback
             separations.append((double)contactPoints[i].separation);
             isContact = contactPoints[i].separation < 0.007 || isContact;
           }
+          // cout << "done" << endl;
           positions.reshape(-1, 3);
           impulses.reshape(-1, 3);
 
           std::shared_ptr<rai::ContactPair> contactPair = make_shared<rai::ContactPair>(_first, _second, positions, impulses, isContact);
+          // cout << "setting contacts pair" << endl;
           contactPairs(_first->ID)(_second->ID) = contactPair;
+        }else {
+          // cout << "setting contacts nptr" << endl;
+          contactPairs(_first->ID)(_second->ID) = nullptr;
         }
       }
     }
