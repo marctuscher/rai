@@ -149,15 +149,15 @@ class ContactReportCallback: public PxSimulationEventCallback
         cout << "adding rows" << endl;
         contactPairs.append(rai::Array<std::shared_ptr<rai::ContactPair>>());
       }
-      cout << "contactPairs(_first->ID).d0" << contactPairs(_first->ID).d0 << endl;
-      cout << "_first->ID: " << _second->ID << contactPairs.d0 << endl;
+      // cout << "contactPairs(_first->ID).d0" << contactPairs(_first->ID).d0 << endl;
+      // cout << "_first->ID: " << _second->ID << contactPairs.d0 << endl;
       while (contactPairs(_first->ID).d0 <= _second->ID)
       {
         cout << "adding cols" << endl;
         contactPairs(_first->ID).append(nullptr);
       }
 
-      cout << "findats" << endl;
+      // cout << "findats" << endl;
       if (_first->ats.find<double>("physx_contacts") && _second->ats.find<double>("physx_contacts"))
       {
         // cout << "Checking contact " <<  (uint) contactCount << endl;
