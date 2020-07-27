@@ -50,14 +50,13 @@ void conv_ArrCloud_PclCloud(PclC& cloud,
   CHECK_EQ(cloud.size(), pts.N/3, "");
   double* p=pts.p;
   byte* c=rgb.p;
-  for(pcl::PointXYZRGB& pt:cloud) {
-    pt.x = (*p++); //pts.elem(i*3+0);
-    pt.y = (*p++); //pts.elem(i*3+1);
-    pt.z = (*p++); //pts.elem(i*3+2);
-    pt.r = (*c++); //255.*cols.elem(i*3+0);
-    pt.g = (*c++); //255.*cols.elem(i*3+1);
-    pt.b = (*c++); //255.*cols.elem(i*3+2);
-//    i++;
+  for(uint i = 0; i<cloud.size(); i++) {
+    cloud[i].x = (*p++); //pts.elem(i*3+0);
+    cloud[i].y = (*p++); //pts.elem(i*3+1);
+    cloud[i].z = (*p++); //pts.elem(i*3+2);
+    cloud[i].r = (*c++); //255.*cols.elem(i*3+0);
+    cloud[i].g = (*c++); //255.*cols.elem(i*3+1);
+    cloud[i].b = (*c++); //255.*cols.elem(i*3+2);
   }
 }
 

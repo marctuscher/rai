@@ -196,6 +196,8 @@ pybind11::arg("object"))
 
 .def("displayTrajectory", [](ry::RyKOMO& self) {
   rai::system("mkdir -p z.vid");
+  self.komo->displayCamera();
+  self.komo->gl->resize(700,500);
   self.komo->displayTrajectory(1., false, false, "z.vid/");
 })
 ;

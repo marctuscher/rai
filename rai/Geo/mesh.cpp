@@ -47,6 +47,8 @@ void rai::Mesh::clear() {
 }
 
 void rai::Mesh::setBox() {
+  T.clear();
+  V.clear();
   double verts[24] = {
     -.5, -.5, -.5,
       +.5, -.5, -.5,

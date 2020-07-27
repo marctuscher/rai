@@ -26,6 +26,7 @@ struct KinViewer : Thread {
   ProxyA proxiesCopy;
   struct OpenGL* gl;
   int cameraFrameID=-1;
+  int picCount = 0;
   KinViewer(const Var<rai::Configuration>& _kin, double beatIntervalSec=-1., const char* _cameraFrameName=nullptr);
   ~KinViewer();
   void open();

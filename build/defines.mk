@@ -322,7 +322,7 @@ endif
 ifeq ($(FILTERREG), 1)
 CPATH := $(CPATH):$(HOME)/git/uni/masterarbeit/poser/:/usr/local/cuda-10.1/include/:
 CPATH := $(CPATH):$(HOME)/git/uni/masterarbeit/poser/external/eigen3/:
-PCL19 = 1
+PCL110 = 1
 OPENCV4 = 1
 LPATHS += $(HOME)/git/uni/masterarbeit/poser/build/corr_search/
 LPATHS += $(HOME)/git/uni/masterarbeit/poser/build/corr_search/gmm/
@@ -344,14 +344,14 @@ LIBS += -Wl,--whole-archive -lcloudproc_lib -lcommon_lib -lcorr_common_lib -lgeo
 LIBS += -lglog -lcuda -lcublas -lcudart -lboost_filesystem -lboost_system#-lgtest
 endif
 
-ifeq ($(PCL19),1)
+ifeq ($(PCL110),1)
 #EIGEN_NEW = 1
 EIGEN = 1
 QHULL = 1
-CPATH := $(HOME)/opt/include/pcl-1.9/:$(CPATH)
+CPATH := $(HOME)/opt/include/pcl-1.10/:$(CPATH)
 LPATHS += $(HOME)/opt/lib
 CXXFLAGS  +=  -DRAI_PCL -DEIGEN_USE_NEW_STDVECTOR -DEIGEN_YES_I_KNOW_SPARSE_MODULE_IS_NOT_STABLE_YET -march=native -msse4.2 -mfpmath=sse -O2
-LIBS += -lpcl_io -lpcl_recognition -lpcl_people -lpcl_outofcore -lpcl_tracking -lpcl_keypoints -lpcl_visualization -lpcl_registration -lpcl_segmentation -lpcl_features -lpcl_surface -lpcl_tracking -lpcl_filters -lpcl_sample_consensus -lpcl_search -lpcl_kdtree -lpcl_octree -lpcl_common
+LIBS += -lpcl_io -lpcl_recognition -lpcl_people -lpcl_outofcore -lpcl_tracking -lpcl_keypoints -lpcl_visualization -lpcl_registration -lpcl_segmentation -lpcl_features -lpcl_surface -lpcl_tracking -lpcl_filters -lpcl_sample_consensus -lpcl_search -lpcl_kdtree -lpcl_octree -lpcl_common 
 CPATH := $(CPATH):/usr/include/vtk-6.3/:
 
 endif

@@ -229,6 +229,11 @@ void rai::CameraView::done(const char* _func_) {
   }
 }
 
+arr rai::CameraView::getFxypxy() {
+  auto sen = currentSensor;
+  return ARR(sen->cam.focalLength*sen->height, sen->cam.focalLength*sen->height, .5*(sen->width-1.), .5*(sen->height-1.));
+}
+
 //===========================================================================
 
 rai::Sim_CameraView::Sim_CameraView(Var<rai::Configuration>& _kin,

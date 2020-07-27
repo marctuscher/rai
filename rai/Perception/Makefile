@@ -6,7 +6,7 @@ OUTPUT = lib$(NAME).so
 GL = 1
 LAPACK = 1
 OPENCV4 = 1
-PCL19 = 1
+PCL110 = 1
 X264 = 0
 DEPEND = Core Geo Gui Kin Algo Control
 

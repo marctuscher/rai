@@ -3,7 +3,7 @@ NAME   = $(shell basename `pwd`)
 OUTPUT = lib$(NAME).so
 
 ROS = 1
-PCL = 1
+PCL = 0
 DEPEND = Core KOMO Kin Gui Logic
 
 CXXFLAGS += -DRAI_ROS_BAXTER

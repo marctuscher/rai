@@ -46,7 +46,12 @@ pybind11::arg("C2")
 "add the contents of the file to C",
 pybind11::arg("file_name")
     )
-
+.def("setVisualsOnly", [](ry::Config& self, bool& value){
+  self.set()->orsDrawVisualsOnly = value;
+})
+.def("setDrawProxies", [](ry::Config& self, bool& value){
+  self.set()->orsDrawProxies = value;
+})
 .def("addFrame", [](ry::Config& self, const std::string& name, const std::string& parent, const std::string& args) {
   ry::RyFrame f;
   f.config = self.data;
@@ -309,6 +314,10 @@ pybind11::arg("belowMargin") = 1.
 "create a viewer for this configuration. Optionally, specify a frame that is the origin of the viewer camera",
 pybind11::arg("frame")="")
 
+.def("watch", [](ry::Config& self, bool& wait){
+ self.set()->watch(wait);
+})
+
 .def("cameraView", [](ry::Config& self) {
   ry::RyCameraView view;
   view.cam = make_shared<rai::CameraView>(self.get(), true, 0);
@@ -532,6 +541,11 @@ pybind11::arg("globalCoordinates") = true)
   ry::ImageViewer ret;
   ret.view = make_shared<ImageViewer>(self.segmentation);
   return ret;
+})
+
+.def("get_intrinsics", [](ry::RyCameraView& self) {
+  arr intrinsics = self.cam->getFxypxy();
+  return pybind11::array(intrinsics.dim(), intrinsics.p);
 })
 
 //-- displays

@@ -59,6 +59,7 @@ struct CameraView : GLDrawer {
 
   //-- displays
   void watch_PCL(const arr& pts, const byteA& rgb);
+  arr getFxypxy();
 
   void glDraw(OpenGL& gl);
 

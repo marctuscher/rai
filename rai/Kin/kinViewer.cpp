@@ -29,9 +29,9 @@ KinViewer::~KinViewer() {
 
 void KinViewer::open() {
   gl = new OpenGL(STRING("KinViewer: "<<world.name()));
-  gl->add(glStandardScene);
+  gl->add(glStandardScene, 0);
   gl->add(glDrawMeshes, &meshesCopy);
-//  gl->add(rai::glDrawProxies, &proxiesCopy);
+  //gl->add(rai::glDrawProxies, &proxiesCopy);
   gl->camera.setDefault();
   if(cameraFrameID>=0) {
     rai::Frame* frame = world.get()->frames(cameraFrameID);
@@ -90,7 +90,14 @@ void KinViewer::step() {
     for(uint i=0; i<X.N; i++) meshesCopy(i).glX = X(i);
   }
 
-  gl->update(nullptr, true); //nullptr, false, false, true);
+  int key = gl->update(nullptr, true); //nullptr, false, false, true);
+  if (key == 112){
+    gl->resize(900, 800);
+    rai::system(STRING("mkdir -p vid"));
+    write_ppm(gl->captureImage, STRING("vid/"<<int(picCount)<<".ppm"));
+    picCount++;
+  }
+  gl->pressedkey = 0;
 }
 
 //===========================================================================
