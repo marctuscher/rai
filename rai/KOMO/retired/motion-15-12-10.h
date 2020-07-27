@@ -9,8 +9,8 @@
 #ifndef _MT_motion_h
 #define _MT_motion_h
 
-#include <Kin/kin.h>
-#include <Optim/optimization.h>
+#include "../Kin/kin.h"
+#include "../Optim/optimization.h"
 
 /* Notes
   -- transition models: kinematic, non-holonomic (vel = B u), pseudo dynamic, non-hol dynamic (acc = B u), real dynamic
@@ -203,7 +203,7 @@ struct MotionProblem_EndPoseFunction {
 //
 
 void sineProfile(arr& q, const arr& q0, const arr& qT, uint T);
-arr reverseTrajectory(const arr& q);
+arr reversePath(const arr& q);
 void getVel(arr& v, const arr& q, double tau);
 void getAcc(arr& a, const arr& q, double tau);
 

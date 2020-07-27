@@ -8,10 +8,10 @@
 
 #pragma once
 
-#include <Kin/kin.h>
-#include <Optim/optimization.h>
-#include <Optim/KOMO_Problem.h>
-#include "feature.h"
+#include "../Kin/kin.h"
+#include "../Optim/optimization.h"
+#include "../Optim/KOMO_Problem.h"
+#include "../Kin/feature.h"
 
 //===========================================================================
 //
@@ -137,7 +137,7 @@ struct KOMO {
 
 arr getH_rate_diag(const rai::Configuration& world);
 void sineProfile(arr& q, const arr& q0, const arr& qT, uint T);
-arr reverseTrajectory(const arr& q);
+arr reversePath(const arr& q);
 void getVel(arr& v, const arr& q, double tau);
 void getAcc(arr& a, const arr& q, double tau);
 

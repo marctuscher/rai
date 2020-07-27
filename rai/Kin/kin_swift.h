@@ -10,12 +10,6 @@
 
 #include "kin.h"
 
-//===========================================================================
-/**
- * @defgroup rai_interface_SWIFT SWIFT Interface.
- * @{
- */
-
 class SWIFT_Scene;
 
 /// contains all information necessary to communicate with swift
@@ -24,7 +18,7 @@ struct SwiftInterface {
   intA INDEXswift2frame, INDEXshape2swift;
   double cutoff;
 
-  SwiftInterface(const rai::Configuration& world, double _cutoff=.2);
+  SwiftInterface(const rai::Configuration& world, double _cutoff=.2, int verbose=0);
   ~SwiftInterface();
 
   void setCutoff(double _cutoff) { cutoff=_cutoff; }
@@ -46,4 +40,3 @@ struct SwiftInterface {
   void swiftQueryExactDistance();
   uint countObjects();
 };
-/** @} */

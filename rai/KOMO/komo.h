@@ -7,13 +7,15 @@
     --------------------------------------------------------------  */
 
 #pragma once
-#include <Kin/kin.h>
-#include <Optim/optimization.h>
-#include <Optim/constrained.h>
-#include <Optim/KOMO_Problem.h>
+
 #include "objective.h"
-#include <Kin/switch.h>
-#include <Kin/featureSymbols.h>
+#include "../Kin/kin.h"
+#include "../Optim/optimization.h"
+#include "../Optim/constrained.h"
+#include "../Optim/KOMO_Problem.h"
+#include "../Optim/newOptim.h"
+#include "../Kin/switch.h"
+#include "../Kin/featureSymbols.h"
 
 //===========================================================================
 
@@ -95,7 +97,7 @@ struct KOMO : NonCopyable {
   uint T=0;                    ///< total number of time steps
   double tau=0.;               ///< real time duration of single step (used when evaluating task space velocities/accelerations)
   uint k_order=0;              ///< the (Markov) order of the KOMO problem (default 2)
-  rai::Array<Objective*> objectives;     ///< list of tasks
+  rai::Array<ptr<Objective>> objectives;    ///< list of tasks
   rai::Array<rai::KinematicSwitch*> switches;  ///< list of kinematic switches along the motion
 
   //-- internals
@@ -109,10 +111,11 @@ struct KOMO : NonCopyable {
 
   //-- optimizer
   bool denseOptimization=false;///< calls optimization with a dense (instead of banded) representation
-  bool sparseOptimization=true;///< calls optimization with a sparse (instead of banded) representation
+  bool sparseOptimization=false;///< calls optimization with a sparse (instead of banded) representation
   OptConstrained *opt=0;       ///< optimizer; created in run()
   arr x, dual;                 ///< the primal and dual solution
   arr z, splineB;              ///< when a spline representation is used: z are the nodes; splineB the B-spline matrix; x = splineB * z
+  arr bound_lo, bound_up;      ///< bounds for clipping within Newton
   //return values
   double sos, eq, ineq;
 
@@ -133,7 +136,7 @@ struct KOMO : NonCopyable {
 
   //-- setup the problem
   void setModel(const rai::Configuration& C, bool _useSwift=true);
-  void setTiming(double _phases=1., uint _stepsPerPhase=10, double durationPerPhase=5., uint _k_order=2);
+  void setTiming(double _phases=1., uint _stepsPerPhase=30, double durationPerPhase=5., uint _k_order=2);
   void setPairedTimes();
   void activateCollisions(const char* s1, const char* s2);
   void deactivateCollisions(const char* s1, const char* s2);
@@ -155,10 +158,10 @@ struct KOMO : NonCopyable {
    * they allow the user to add a cost task, or a kinematic switch in the problem definition
    * Typically, the user does not call them directly, but uses the many methods below
    * Think of all of the below as examples for how to set arbirary tasks/switches yourself */
-  struct Objective* addObjective(const arr& times, const ptr<Feature>& f,
-                                 ObjectiveType type, const arr& scale=NoArr, const arr& target=NoArr, int order=-1, int deltaFromStep=0, int deltaToStep=0);
-  struct Objective* addObjective(const arr& times, const FeatureSymbol& feat, const StringA& frames,
-                                 ObjectiveType type, const arr& scale=NoArr, const arr& target=NoArr, int order=-1, int deltaFromStep=0, int deltaToStep=0);
+  ptr<struct Objective> addObjective(const arr& times, const ptr<Feature>& f,
+                                     ObjectiveType type, const arr& scale=NoArr, const arr& target=NoArr, int order=-1, int deltaFromStep=0, int deltaToStep=0);
+  ptr<struct Objective> addObjective(const arr& times, const FeatureSymbol& feat, const StringA& frames,
+                                     ObjectiveType type, const arr& scale=NoArr, const arr& target=NoArr, int order=-1, int deltaFromStep=0, int deltaToStep=0);
 
   void addSwitch(double time, bool before, rai::KinematicSwitch* sw);
   void addSwitch(double time, bool before, rai::JointType type, rai::SwitchInitializationType init,
@@ -179,7 +182,8 @@ struct KOMO : NonCopyable {
 
   //-- tasks mid-level
 //  void setSquaredQAccelerations(double startTime=0., double endTime=-1., double prec=1.);
-  void setSquaredQAccVelHoming(double startTime=0., double endTime=-1., double accPrec=1., double velPrec=0., double homingPrec=1e-2);
+  void add_qControlObjective(const arr& times, uint order, double scale=1., const arr& target=NoArr, int deltaFromStep=0, int deltaToStep=0);
+  void setSquaredQAccVelHoming(double startTime=0., double endTime=-1., double accPrec=1., double velPrec=0., double homingPrec=1e-2, int deltaFromStep=0, int deltaToStep=0);
 //  void setSquaredQVelocities(double startTime=0., double endTime=-1., double prec=1.);
 //  void setFixEffectiveJoints(double startTime=0., double endTime=-1., double prec=3e1);
 //  void setFixSwitchedObjects(double startTime=0., double endTime=-1., double prec=3e1);
@@ -258,14 +262,16 @@ struct KOMO : NonCopyable {
   //-- optimization macros
   void setSpline(uint splineT);      ///< optimize B-spline nodes instead of the path; splineT specifies the time steps per node
   void reset(double initNoise=.01);  ///< reset the optimizer (initializes x to a default path)
+  void setConfiguration(int t, const arr& q);
   void setInitialConfigurations(const arr& q);
   void initWithConstant(const arr& q);
   void initWithWaypoints(const arrA& waypoints, uint waypointStepsPerPhase=1, bool sineProfile=true);
-  void run();                        ///< run the optimization (using OptConstrained -- its parameters are read from the cfg file)
+  void run(const OptOptions options=NOOPT);                        ///< run the optimization (using OptConstrained -- its parameters are read from the cfg file)
   void run_sub(const uintA& X, const uintA& Y);
-  void optimize(bool initNoise=true);
+  void optimize(bool inititialize=true, double initNoise=.01);
 
   rai::Configuration& getConfiguration(double phase);
+  rai::Configuration& getConfiguration_t(int t);
   arr getJointState(double phase);
   arr getFrameState(double phase);
   arr getPath_decisionVariable();
@@ -281,15 +287,15 @@ struct KOMO : NonCopyable {
   arr getActiveConstraintJacobian();
 
   void reportProblem(ostream& os=std::cout);
-  Graph getReport(bool gnuplt=false, int reportFeatures=0, ostream& featuresOs=std::cout); ///< return a 'dictionary' summarizing the optimization results (optional: gnuplot task costs; output detailed cost features per time slice)
-  Graph getProblemGraph(bool includeValues, bool includeSolution=true);
+  rai::Graph getReport(bool gnuplt=false, int reportFeatures=0, ostream& featuresOs=std::cout); ///< return a 'dictionary' summarizing the optimization results (optional: gnuplot task costs; output detailed cost features per time slice)
+  rai::Graph getProblemGraph(bool includeValues, bool includeSolution=true);
   double getConstraintViolations();
   double getCosts();
   void reportProxies(ostream& os=std::cout, double belowMargin=.1); ///< report the proxies (collisions) for each time slice
-  Graph getContacts(); ///< report the contacts
+  rai::Graph getContacts(); ///< report the contacts
   rai::Array<rai::Transformation> reportEffectiveJoints(ostream& os=std::cout);
 
-  void checkGradients(bool dense=false);          ///< checks all gradients numerically
+  void checkGradients();          ///< checks all gradients numerically
 
   void plotTrajectory();
   void plotPhaseTrajectory();
@@ -302,10 +308,14 @@ struct KOMO : NonCopyable {
   // internal (kind of private)
   //
 
-  void selectJointsBySubtrees(StringA& roots);
+  void selectJointsBySubtrees(const StringA& roots, const arr& times={}, bool notThose=false);
   void clearObjectives();
-  void setupConfigurations();   ///< this creates the @configurations@, that is, copies the original world T times (after setTiming!) perhaps modified by KINEMATIC SWITCHES and FLAGS
+  void setupConfigurations(const arr& q_init=NoArr, const StringA& q_initJoints=NoStringA);   ///< this creates the @configurations@, that is, copies the original world T times (after setTiming!) perhaps modified by KINEMATIC SWITCHES and FLAGS
   void setupRepresentations();
+  void setBounds();
+  void checkBounds(const arr& x);
+  void retrospectApplySwitches(rai::Array<rai::KinematicSwitch*>& _switches);
+  void retrospectChangeJointType(int startStep, int endStep, uint frameID, rai::JointType newJointType);
   void set_x(const arr& x, const uintA& selectedConfigurationsOnly=NoUintA);            ///< set the state trajectory of all configurations
 //  void setState(const arr& x, const uintA& selectedVariablesOnly=NoUintA);            ///< set the state trajectory of all configurations
   uint dim_x(uint t) { return configurations(t+k_order)->getJointStateDimension(); }
@@ -352,5 +362,54 @@ struct KOMO : NonCopyable {
     virtual void getPartialPhi(arr& phi, arrA& J, arrA& H, const uintA& whichPhi);
     virtual void getSemantics(StringA& varNames, StringA& phiNames);
   } graph_problem;
+
+  struct TimeSliceProblem : ConstrainedProblem {
+    KOMO& komo;
+    int slice;
+    uint dimPhi=0;
+
+    TimeSliceProblem(KOMO& _komo, int _slice) : komo(_komo), slice(_slice) {}
+
+    void getDimPhi();
+    virtual void phi(arr& phi, arr& J, arr& H, ObjectiveTypeA& tt, const arr& x);
+  };
+
+  struct Conv_KOMO_MathematicalProgram : MathematicalProgram {
+    KOMO& komo;
+    uintA xIndex2VarId;
+    struct VariableIndexEntry{ rai::Joint *joint=0; rai::ForceExchange *force=0; uint dim; uint xIndex; };
+    rai::Array<VariableIndexEntry> variableIndex;
+
+    uint featuresDim;
+    struct FeatureIndexEntry{ ptr<Objective> ob; ConfigurationL Ctuple; uint t; uint dim; intA varIds; };
+    rai::Array<FeatureIndexEntry> featureIndex;
+
+    Conv_KOMO_MathematicalProgram(KOMO& _komo) : komo(_komo) {}
+
+  private:
+    void createIndices();
+
+  public:
+    ///-- signature/structure of the mathematical problem
+    virtual uint getDimension();
+    virtual void getBounds(arr& bounds_lo, arr& bounds_up);
+    virtual void getFeatureTypes(ObjectiveTypeA& featureTypes);
+    virtual bool isStructured();
+    virtual void getStructure(uintA& variableDimensions, //the size of each variable block
+                              uintA& featureDimensions,  //the size of each feature block
+                              intAA& featureVariables     //which variables the j-th feature block depends on
+                              );
+
+    ///--- evaluation
+
+    //unstructured (batch) interface (where J may/should be sparse! and H optional
+    virtual void evaluate(arr& phi, arr& J, arr& H, const arr& x); //default implementation: if isStructured, gets everything from there
+
+    //structured (local) interface
+    virtual void setSingleVariable(uint var_id, const arr& x); //set a single variable block
+    virtual void evaluateSingleFeature(uint feat_id, arr& phi, arr& J, arr& H); //get a single feature block
+
+    void reportFeatures();
+  };
 };
 

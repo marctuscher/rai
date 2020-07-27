@@ -6,21 +6,12 @@
     Please see <root-path>/LICENSE for details.
     --------------------------------------------------------------  */
 
-/**
- * @file
- * @ingroup group_ors
- */
-/**
- * @ingroup group_ors
- * @{
- */
-
 #include "kin_swift.h"
 #include "proxy.h"
 #include "frame.h"
-#include <Algo/ann.h>
+#include "../Algo/ann.h"
 
-#ifdef RAI_extern_SWIFT
+#ifdef RAI_SWIFT
 
 #ifdef RAI_SINGLE
 #  define SWIFT_USE_FLOAT
@@ -40,22 +31,22 @@ SwiftInterface::~SwiftInterface() {
   //cout <<" -- SwiftInterface closed" <<endl;
 }
 
-SwiftInterface::SwiftInterface(const rai::Configuration& world, double _cutoff)
+SwiftInterface::SwiftInterface(const rai::Configuration& world, double _cutoff, int verbose)
   : scene(nullptr), cutoff(_cutoff) {
   bool r, add;
 
   if(scene) delete scene;
 
-  scene = new SWIFT_Scene(false, false);
+  scene = new SWIFT_Scene(false, true); //false, false);
 
   INDEXswift2frame.resize(world.frames.N);  INDEXswift2frame=-1;
   INDEXshape2swift.resize(world.frames.N);  INDEXshape2swift=-1;
 
-//  cout <<" -- SwiftInterface init";
+  if(verbose>0) cout <<" -- SwiftInterface init";
   rai::Shape* s;
   for(rai::Frame* f: world.frames) if((s=f->shape) && s->cont) {
-      //cout <<'.' <<flush;
-      //cout <<'.' <<f->name <<flush;
+      if(verbose>0) cout <<'.' <<flush;
+      if(verbose>1) cout <<f->name <<flush;
       add=true;
       switch(s->type()) {
         case rai::ST_none: HALT("shapes should have a type - somehow wrong initialization..."); break;
@@ -108,7 +99,7 @@ SwiftInterface::SwiftInterface(const rai::Configuration& world, double _cutoff)
   initActivations(world);
 
   pushToSwift(world);
-//  cout <<"...done" <<endl;
+  if(verbose>0) cout <<"...done" <<endl;
 }
 
 void SwiftInterface::reinitShape(const rai::Frame* f) {
@@ -256,6 +247,12 @@ void SwiftInterface::pullFromSwift(rai::Configuration& world, bool dumpReport) {
     world.proxies.clear();
     cout <<"... catching error '" <<e.what() <<"' -- SWIFT failed! .. no proxies for this posture!!..." <<endl;
     return;
+  } catch(std::pair<int,int>& e) {
+    world.proxies.clear();
+    cout <<"... catching error at pair ("
+        <<e.first <<'(' <<world.frames(INDEXswift2frame(e.first))->name <<") "
+        <<e.second <<'(' <<world.frames(INDEXswift2frame(e.second))->name <<") -- SWIFT failed! .. no proxies for this posture!!..." <<endl;
+    return;
   }
 
   if(dumpReport) {
@@ -273,7 +270,6 @@ void SwiftInterface::pullFromSwift(rai::Configuration& world, bool dumpReport) {
     }
   }
 
-  for(rai::Proxy& p:world.proxies) p.del_coll();
   world.proxies.clear();
   world.proxies.resize(np);
 
@@ -384,12 +380,12 @@ uint SwiftInterface::countObjects() {
   return n;
 }
 
-#else //RAI_extern_SWIFT
+#else //RAI_SWIFT
 
-#include <Core/util.h>
+#include "../Core/util.h"
 
 SwiftInterface::~SwiftInterface() { NICO }
-SwiftInterface::SwiftInterface(const rai::Configuration& world, double _cutoff){ NICO }
+SwiftInterface::SwiftInterface(const rai::Configuration& world, double _cutoff, int verbose){ NICO }
 
 void SwiftInterface::step(rai::Configuration& world, bool dumpReport) { NICO }
 void SwiftInterface::pushToSwift(const rai::Configuration& world) { NICO }
@@ -409,4 +405,3 @@ void SwiftInterface::swiftQueryExactDistance() { NICO }
 uint SwiftInterface::countObjects(){ NICO }
 
 #endif
-/** @} */

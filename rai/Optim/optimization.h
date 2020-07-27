@@ -8,7 +8,7 @@
 
 #pragma once
 
-#include <Core/array.h>
+#include "../Core/array.h"
 
 //===========================================================================
 //
@@ -26,7 +26,7 @@ typedef std::function<void(arr& y, arr& Jy, const arr& x)> VectorFunction;
 /// symbols to declare of which type an objective feature is
 enum ObjectiveType { OT_none=0, OT_f, OT_sos, OT_ineq, OT_eq };
 typedef rai::Array<ObjectiveType> ObjectiveTypeA;
-extern ObjectiveTypeA& NoTermTypeA;
+extern ObjectiveTypeA& NoObjectiveTypeA;
 
 /** A ConstrainedProblem returns a feature vector $phi$ and optionally its Jacobian $J$. For each entry of
  *  this feature vector $tt(i)$ determins whether this is an inequality constraint, an equality constraint,
@@ -74,6 +74,23 @@ inline arr summarizeErrors(const arr& phi, const ObjectiveTypeA& tt) {
     if(tt(i)==OT_eq) err(2) += fabs(phi(i));
   }
   return err;
+}
+
+//===========================================================================
+//
+// accumulative constraints
+//
+
+inline void accumulateInequalities(arr& y, arr& J, const arr& yAll, const arr& JAll){
+  y.resize(1).setZero();
+  if(!!J) J.resize(1,JAll.d1).setZero();
+
+  for(uint i=0;i<yAll.N;i++){
+    if(yAll.elem(i)>0.){
+      y.scalar() += yAll.elem(i);
+      if(!!J && !!JAll) J[0] += JAll[i];
+    }
+  }
 }
 
 //===========================================================================
