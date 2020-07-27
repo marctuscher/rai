@@ -8,8 +8,8 @@
 
 #include "motion.h"
 #include "taskMaps.h"
-#include <Gui/opengl.h>
-#include <Kin/kin_swift.h>
+#include "../Gui/opengl.h"
+#include "../Kin/kin_swift.h"
 #include <climits>
 #include <iomanip>
 
@@ -175,13 +175,13 @@ rai::KinematicSwitch* newSwitch(const Node* specs, const rai::Configuration& wor
     CHECK_EQ(sw->symbol, rai::deleteJoint, "");
     rai::Body* b = world.shapes(sw->fromId)->body;
     if(b->inLinks.N==1) {
-//      CHECK_EQ(b->parentOf.N, 0, "");
+//      CHECK_EQ(b->children.N, 0, "");
       sw->toId = sw->fromId;
       sw->fromId = b->inLinks(0)->from->shapes.first()->index;
-    } else if(b->parentOf.N==1) {
+    } else if(b->children.N==1) {
       CHECK_EQ(b->inLinks.N, 0, "");
-      sw->toId = b->parentOf(0)->from->shapes.first()->index;
-    } else if(b->inLinks.N==0 && b->parentOf.N==0) {
+      sw->toId = b->children(0)->from->shapes.first()->index;
+    } else if(b->inLinks.N==0 && b->children.N==0) {
       RAI_MSG("No link to delete for shape '" <<ref1 <<"'");
       delete sw;
       return nullptr;
@@ -873,7 +873,7 @@ void sineProfile(arr& q, const arr& q0, const arr& qT, uint T) {
   for(uint t=0; t<=T; t++) q[t] = q0 + .5 * (1.-cos(RAI_PI*t/T)) * (qT-q0);
 }
 
-arr reverseTrajectory(const arr& q) {
+arr reversePath(const arr& q) {
   uint T=q.d0-1;
   arr r(T+1, q.d1);
   for(uint t=0; t<=T; t++) r[T-t] = q[t];
